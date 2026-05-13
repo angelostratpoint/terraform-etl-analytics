@@ -1,0 +1,206 @@
+locals {
+  bucket_name = "cdcu-${var.environment}-data-lake"
+}
+
+resource "aws_s3_bucket" "cdcu_data_lake" {
+  bucket = local.bucket_name
+
+  tags = merge(var.tags, {
+    Name = local.bucket_name
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "cdcu_data_lake" {
+  bucket = aws_s3_bucket.cdcu_data_lake.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "cdcu_data_lake" {
+  bucket = aws_s3_bucket.cdcu_data_lake.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cdcu_data_lake" {
+  bucket = aws_s3_bucket.cdcu_data_lake.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = var.enable_kms ? "aws:kms" : "AES256"
+      kms_master_key_id = var.enable_kms ? var.kms_key_arn : null
+    }
+    bucket_key_enabled = var.enable_kms
+  }
+}
+
+resource "aws_s3_bucket_policy" "cdcu_data_lake" {
+  bucket = aws_s3_bucket.cdcu_data_lake.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyNonHTTPS"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.cdcu_data_lake.arn}/*"
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+      {
+        Sid       = "DenyHTTPGetObject"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.cdcu_data_lake.arn}/*"
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+    ]
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.cdcu_data_lake]
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
+  bucket = aws_s3_bucket.cdcu_data_lake.id
+
+  rule {
+    id     = "logs-intelligent-tiering"
+    status = "Enabled"
+
+    filter {
+      prefix = "logs/"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+  }
+
+  rule {
+    id     = "errors-intelligent-tiering"
+    status = "Enabled"
+
+    filter {
+      prefix = "errors/"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+  }
+
+  rule {
+    id     = "processed-archive"
+    status = "Enabled"
+
+    filter {
+      prefix = "processed/"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 180
+      storage_class = "GLACIER"
+    }
+  }
+}
+
+locals {
+  # S3 has no real folders; zero-byte objects create visible prefixes in the console.
+  folder_prefixes = [
+    "raw/microsite/",
+    "raw/legacy/",
+    "standardized/microsite/",
+    "standardized/legacy/",
+    "processed/matching/merge/",
+    "processed/matching/unique/",
+    "processed/matching/manual_review/",
+    "logs/",
+    "errors/",
+  ]
+}
+
+resource "aws_s3_object" "folder_placeholders" {
+  for_each = toset(local.folder_prefixes)
+
+  bucket  = aws_s3_bucket.cdcu_data_lake.id
+  key     = each.value
+  content = ""
+
+  tags = var.tags
+}
+
+resource "aws_s3_bucket" "cdcu_athena_results" {
+  bucket = "cdcu-${var.environment}-athena-results"
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-athena-results"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "cdcu_athena_results" {
+  bucket = aws_s3_bucket.cdcu_athena_results.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "cdcu_athena_results" {
+  bucket = aws_s3_bucket.cdcu_athena_results.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cdcu_athena_results" {
+  bucket = aws_s3_bucket.cdcu_athena_results.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = var.enable_kms ? "aws:kms" : "AES256"
+      kms_master_key_id = var.enable_kms ? var.kms_key_arn : null
+    }
+    bucket_key_enabled = var.enable_kms
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cdcu_athena_results" {
+  bucket = aws_s3_bucket.cdcu_athena_results.id
+
+  rule {
+    id     = "athena-results-expiry"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 30
+    }
+  }
+}

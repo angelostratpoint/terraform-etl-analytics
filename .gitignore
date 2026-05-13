@@ -1,0 +1,55 @@
+# Terraform state files
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+
+# Terraform plan files
+*.tfplan
+*.plan
+
+# Terraform directory
+.terraform/
+
+# Terraform variable files (exclude real tfvars, keep examples)
+*.tfvars
+!*.tfvars.example
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Sensitive files
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+credentials
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Artifact placeholder files (keep READMEs, ignore .gitkeep in non-empty dirs)
+artifacts/**/.gitkeep

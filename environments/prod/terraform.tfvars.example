@@ -1,0 +1,46 @@
+# Copy to terraform.tfvars and fill in actual values.
+# Never commit terraform.tfvars to source control.
+
+environment = "prod"
+
+terraform_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-terraform-deployment-role"
+
+# VPC and subnet — obtain from BPI MS Cloud Engineer
+vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+subnet_ids = [
+  "subnet-xxxxxxxxxxxxxxxxx",
+  "subnet-yyyyyyyyyyyyyyyyy",
+]
+
+availability_zone = "ap-southeast-1a"
+
+github_org  = "your-github-org"
+github_repo = "terraform-etl-analytics"
+
+sso_principal_arns = [
+  "arn:aws:iam::123456789012:role/AWSReservedSSO_DataEngineer_xxxxxxxxxxxxxxxx"
+]
+
+# KMS always enabled in prod
+enable_kms    = true
+sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:cdcu-prod-alerts"
+
+# Higher worker counts for 1M record processing
+glue_worker_count = 10
+glue_worker_type  = "G.1X"
+
+git_repository_url = "https://github.com/your-github-org/terraform-etl-analytics.git"
+
+enable_sagemaker_unified_studio = true
+sagemaker_studio_user_profile_names = [
+  "data-scientist-01",
+  "data-scientist-02",
+]
+sagemaker_notebook_instance_count        = 4
+sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
+sagemaker_studio_app_network_access_type = "VpcOnly"
+
+enable_quicksight              = true
+quicksight_admin_principal_arn = ""
+quicksight_spice_capacity_gb   = 10

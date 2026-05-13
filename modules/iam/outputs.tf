@@ -43,6 +43,16 @@ output "readonly_role_arn" {
   value       = aws_iam_role.cdcu_readonly.arn
 }
 
+output "qa_role_arn" {
+  description = "ARN of the QA tester role"
+  value       = aws_iam_role.cdcu_qa.arn
+}
+
+output "business_review_role_arn" {
+  description = "ARN of the business reviewer role"
+  value       = aws_iam_role.cdcu_business_review.arn
+}
+
 output "all_role_arns" {
   description = "Map of all CDCU IAM role ARNs"
   value = {
@@ -53,5 +63,7 @@ output "all_role_arns" {
     quicksight_access    = aws_iam_role.cdcu_quicksight_access.arn
     developer            = aws_iam_role.cdcu_developer.arn
     readonly             = aws_iam_role.cdcu_readonly.arn
+    qa                   = aws_iam_role.cdcu_qa.arn
+    business_review      = aws_iam_role.cdcu_business_review.arn
   }
 }

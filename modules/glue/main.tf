@@ -1,13 +1,23 @@
-data "aws_secretsmanager_secret" "mysql_connection" {
-  name = "cdcu/${var.environment}/mysql-connection"
+# Separate secrets for Microsite and Legacy — two distinct MySQL source databases
+data "aws_secretsmanager_secret" "microsite_mysql_connection" {
+  name = "cdcu/${var.environment}/microsite-mysql-connection"
 }
 
-data "aws_secretsmanager_secret_version" "mysql_connection" {
-  secret_id = data.aws_secretsmanager_secret.mysql_connection.id
+data "aws_secretsmanager_secret_version" "microsite_mysql_connection" {
+  secret_id = data.aws_secretsmanager_secret.microsite_mysql_connection.id
+}
+
+data "aws_secretsmanager_secret" "legacy_mysql_connection" {
+  name = "cdcu/${var.environment}/legacy-mysql-connection"
+}
+
+data "aws_secretsmanager_secret_version" "legacy_mysql_connection" {
+  secret_id = data.aws_secretsmanager_secret.legacy_mysql_connection.id
 }
 
 locals {
-  mysql_secret = jsondecode(data.aws_secretsmanager_secret_version.mysql_connection.secret_string)
+  microsite_secret = jsondecode(data.aws_secretsmanager_secret_version.microsite_mysql_connection.secret_string)
+  legacy_secret    = jsondecode(data.aws_secretsmanager_secret_version.legacy_mysql_connection.secret_string)
 }
 
 resource "aws_glue_catalog_database" "cdcu" {
@@ -21,9 +31,9 @@ resource "aws_glue_connection" "microsite_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://${local.mysql_secret.host}:${local.mysql_secret.port}/${local.mysql_secret.dbname}"
-    USERNAME            = local.mysql_secret.username
-    PASSWORD            = local.mysql_secret.password
+    JDBC_CONNECTION_URL = "jdbc:mysql://${local.microsite_secret.host}:${local.microsite_secret.port}/${local.microsite_secret.dbname}"
+    USERNAME            = local.microsite_secret.username
+    PASSWORD            = local.microsite_secret.password
   }
 
   physical_connection_requirements {
@@ -43,9 +53,9 @@ resource "aws_glue_connection" "legacy_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://${local.mysql_secret.host}:${local.mysql_secret.port}/${local.mysql_secret.dbname}"
-    USERNAME            = local.mysql_secret.username
-    PASSWORD            = local.mysql_secret.password
+    JDBC_CONNECTION_URL = "jdbc:mysql://${local.legacy_secret.host}:${local.legacy_secret.port}/${local.legacy_secret.dbname}"
+    USERNAME            = local.legacy_secret.username
+    PASSWORD            = local.legacy_secret.password
   }
 
   physical_connection_requirements {
@@ -82,10 +92,7 @@ resource "aws_glue_job" "microsite_raw_extraction" {
     "--SOURCE_CONNECTION"                = aws_glue_connection.microsite_mysql.name
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/microsite/"
     "--ENVIRONMENT"                      = var.environment
-    "--SECRET_NAME"                      = "cdcu/${var.environment}/mysql-connection"
-  }
-
-  connections = [aws_glue_connection.microsite_mysql.name]
+    "--SECRET_NAME"                      = "cdcu/${var.environment}/microsite-mysql-connection"
 
   execution_property {
     max_concurrent_runs = 1
@@ -120,7 +127,7 @@ resource "aws_glue_job" "legacy_raw_extraction" {
     "--SOURCE_CONNECTION"                = aws_glue_connection.legacy_mysql.name
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/legacy/"
     "--ENVIRONMENT"                      = var.environment
-    "--SECRET_NAME"                      = "cdcu/${var.environment}/mysql-connection"
+    "--SECRET_NAME"                      = "cdcu/${var.environment}/legacy-mysql-connection"
   }
 
   connections = [aws_glue_connection.legacy_mysql.name]

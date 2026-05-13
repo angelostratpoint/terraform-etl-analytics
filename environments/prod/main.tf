@@ -8,18 +8,30 @@ locals {
     Owner       = "Stratpoint"
     CostCenter  = "CDCU-PROD"
   }
+
+  # IAM role ARN resolution — same pattern as pre-prod.
+  # manage_iam = false (default): use pre-existing manually-created role ARNs.
+  # manage_iam = true: use ARNs from the Terraform-managed IAM module.
+  glue_execution_role_arn      = var.manage_iam ? module.iam[0].glue_execution_role_arn : var.existing_glue_execution_role_arn
+  sagemaker_execution_role_arn = var.manage_iam ? module.iam[0].sagemaker_execution_role_arn : var.existing_sagemaker_execution_role_arn
 }
 
 module "kms" {
   count  = var.enable_kms ? 1 : 0
   source = "../../modules/kms"
 
-  environment       = local.environment
-  allowed_role_arns = []
-  tags              = local.common_tags
+  environment = local.environment
+  allowed_role_arns = var.enable_kms ? [
+    local.glue_execution_role_arn,
+    local.sagemaker_execution_role_arn,
+  ] : []
+  tags = local.common_tags
+
+  depends_on = [module.iam]
 }
 
 module "iam" {
+  count  = var.manage_iam ? 1 : 0
   source = "../../modules/iam"
 
   environment        = local.environment
@@ -74,7 +86,7 @@ module "glue" {
   source = "../../modules/glue"
 
   environment             = local.environment
-  glue_execution_role_arn = module.iam.glue_execution_role_arn
+  glue_execution_role_arn = local.glue_execution_role_arn
   data_lake_bucket        = module.s3.data_lake_bucket_name
   scripts_bucket          = module.s3.data_lake_bucket_name
   glue_security_group_ids = [module.security_groups.glue_security_group_id]
@@ -108,7 +120,7 @@ module "sagemaker" {
   vpc_id                         = var.vpc_id
   subnet_ids                     = local.subnet_ids
   security_group_ids             = [module.security_groups.glue_security_group_id]
-  execution_role_arn             = module.iam.sagemaker_execution_role_arn
+  execution_role_arn             = local.sagemaker_execution_role_arn
   studio_user_profile_names      = var.sagemaker_studio_user_profile_names
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
   notebook_instance_count        = var.sagemaker_notebook_instance_count

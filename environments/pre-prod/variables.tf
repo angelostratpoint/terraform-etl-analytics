@@ -123,3 +123,39 @@ variable "quicksight_spice_capacity_gb" {
   type        = number
   default     = 10
 }
+
+###############################################################################
+# IAM Bypass Variables
+# Per implementation plan Task 3.2: IAM roles and policies are configured
+# manually by Stratpoint/BPI MS before Terraform scripts run (Tasks 3.3+).
+# When manage_iam = false, Terraform skips IAM resource creation and uses
+# the pre-existing role ARNs provided below instead.
+###############################################################################
+
+variable "manage_iam" {
+  description = <<-EOT
+    Whether Terraform should create IAM roles and policies.
+    Set to false when IAM is managed manually (Task 3.2 in the implementation plan).
+    When false, provide the pre-existing role ARNs via the variables below.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "existing_glue_execution_role_arn" {
+  description = "ARN of the pre-existing Glue execution role (used when manage_iam = false)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_sagemaker_execution_role_arn" {
+  description = "ARN of the pre-existing SageMaker execution role (used when manage_iam = false)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_quicksight_access_role_arn" {
+  description = "ARN of the pre-existing QuickSight access role (used when manage_iam = false)"
+  type        = string
+  default     = ""
+}

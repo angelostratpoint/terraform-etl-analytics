@@ -41,6 +41,10 @@ sagemaker_notebook_instance_count        = 4
 sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
-enable_quicksight              = true
-quicksight_admin_principal_arn = ""
-quicksight_spice_capacity_gb   = 10
+# IAM Mode — set to false when IAM roles are created manually (Task 3.2)
+manage_iam = false
+
+# Pre-existing role ARNs — required when manage_iam = false
+existing_glue_execution_role_arn      = "arn:aws:iam::123456789012:role/cdcu-prod-glue-execution-role"
+existing_sagemaker_execution_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-sagemaker-execution-role"
+existing_quicksight_access_role_arn   = "arn:aws:iam::123456789012:role/cdcu-prod-quicksight-access-role"

@@ -35,22 +35,27 @@ data "aws_iam_policy_document" "kms_key_policy" {
     resources = ["*"]
   }
 
-  # Allow CDCU IAM roles to use the key
-  statement {
-    sid    = "AllowCDCURoleKeyUsage"
-    effect = "Allow"
-    principals {
-      type        = "AWS"
-      identifiers = var.allowed_role_arns
+  # Allow CDCU IAM roles to use the key — only rendered when role ARNs are provided.
+  # When allowed_role_arns is empty (e.g. during initial bootstrap before IAM roles exist),
+  # this statement is omitted to avoid an invalid empty-principal key policy error.
+  dynamic "statement" {
+    for_each = length(var.allowed_role_arns) > 0 ? [1] : []
+    content {
+      sid    = "AllowCDCURoleKeyUsage"
+      effect = "Allow"
+      principals {
+        type        = "AWS"
+        identifiers = var.allowed_role_arns
+      }
+      actions = [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+      ]
+      resources = ["*"]
     }
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey",
-    ]
-    resources = ["*"]
   }
 
   # Allow CloudWatch Logs service to use the key

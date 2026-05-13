@@ -81,11 +81,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
   rule {
     id     = "logs-intelligent-tiering"
     status = "Enabled"
-
-    filter {
-      prefix = "logs/"
-    }
-
+    filter { prefix = "logs/" }
     transition {
       days          = 30
       storage_class = "INTELLIGENT_TIERING"
@@ -95,11 +91,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
   rule {
     id     = "errors-intelligent-tiering"
     status = "Enabled"
-
-    filter {
-      prefix = "errors/"
-    }
-
+    filter { prefix = "errors/" }
     transition {
       days          = 30
       storage_class = "INTELLIGENT_TIERING"
@@ -109,19 +101,61 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
   rule {
     id     = "processed-archive"
     status = "Enabled"
-
-    filter {
-      prefix = "processed/"
-    }
-
+    filter { prefix = "processed/" }
     transition {
       days          = 90
       storage_class = "STANDARD_IA"
     }
-
     transition {
       days          = 180
       storage_class = "GLACIER"
+    }
+  }
+
+  # PIA: Stratpoint access is limited to 5 months.
+  # Raw and standardized data contain PII — transition to GLACIER after 6 months,
+  # expire after 12 months unless BPI MS extends retention contractually.
+  rule {
+    id     = "raw-pii-retention"
+    status = "Enabled"
+    filter { prefix = "raw/" }
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+    transition {
+      days          = 180
+      storage_class = "GLACIER"
+    }
+    expiration {
+      days = 365
+    }
+  }
+
+  rule {
+    id     = "standardized-pii-retention"
+    status = "Enabled"
+    filter { prefix = "standardized/" }
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+    transition {
+      days          = 180
+      storage_class = "GLACIER"
+    }
+    expiration {
+      days = 365
+    }
+  }
+
+  # Temp prefix used by Glue jobs as --TempDir — expire after 7 days
+  rule {
+    id     = "temp-cleanup"
+    status = "Enabled"
+    filter { prefix = "temp/" }
+    expiration {
+      days = 7
     }
   }
 }
@@ -138,6 +172,8 @@ locals {
     "processed/matching/manual_review/",
     "logs/",
     "errors/",
+    # temp/ is required by all Glue jobs as --TempDir
+    "temp/",
   ]
 }
 

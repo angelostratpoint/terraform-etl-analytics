@@ -3,21 +3,8 @@ data "aws_secretsmanager_secret" "microsite_mysql_connection" {
   name = "cdcu/${var.environment}/microsite-mysql-connection"
 }
 
-data "aws_secretsmanager_secret_version" "microsite_mysql_connection" {
-  secret_id = data.aws_secretsmanager_secret.microsite_mysql_connection.id
-}
-
 data "aws_secretsmanager_secret" "legacy_mysql_connection" {
   name = "cdcu/${var.environment}/legacy-mysql-connection"
-}
-
-data "aws_secretsmanager_secret_version" "legacy_mysql_connection" {
-  secret_id = data.aws_secretsmanager_secret.legacy_mysql_connection.id
-}
-
-locals {
-  microsite_secret = jsondecode(data.aws_secretsmanager_secret_version.microsite_mysql_connection.secret_string)
-  legacy_secret    = jsondecode(data.aws_secretsmanager_secret_version.legacy_mysql_connection.secret_string)
 }
 
 resource "aws_glue_catalog_database" "cdcu" {
@@ -31,9 +18,7 @@ resource "aws_glue_connection" "microsite_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://${local.microsite_secret.host}:${local.microsite_secret.port}/${local.microsite_secret.dbname}"
-    USERNAME            = local.microsite_secret.username
-    PASSWORD            = local.microsite_secret.password
+    SECRET_ID = "cdcu/${var.environment}/microsite-mysql-connection"
   }
 
   physical_connection_requirements {
@@ -53,9 +38,7 @@ resource "aws_glue_connection" "legacy_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://${local.legacy_secret.host}:${local.legacy_secret.port}/${local.legacy_secret.dbname}"
-    USERNAME            = local.legacy_secret.username
-    PASSWORD            = local.legacy_secret.password
+    SECRET_ID = "cdcu/${var.environment}/legacy-mysql-connection"
   }
 
   physical_connection_requirements {
@@ -78,7 +61,7 @@ resource "aws_glue_job" "microsite_raw_extraction" {
   command {
     name            = "glueetl"
     # Script path uses environment prefix — uploaded by the artifacts module
-    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/microsite_raw_extraction.py"
+    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/extraction/microsite_raw_extraction.py"
     python_version  = "3"
   }
 
@@ -93,6 +76,9 @@ resource "aws_glue_job" "microsite_raw_extraction" {
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/microsite/"
     "--ENVIRONMENT"                      = var.environment
     "--SECRET_NAME"                      = "cdcu/${var.environment}/microsite-mysql-connection"
+  }
+
+  connections = [aws_glue_connection.microsite_mysql.name]
 
   execution_property {
     max_concurrent_runs = 1
@@ -114,7 +100,7 @@ resource "aws_glue_job" "legacy_raw_extraction" {
 
   command {
     name            = "glueetl"
-    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/legacy_raw_extraction.py"
+    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/extraction/legacy_raw_extraction.py"
     python_version  = "3"
   }
 
@@ -152,7 +138,7 @@ resource "aws_glue_job" "microsite_standardization" {
 
   command {
     name            = "glueetl"
-    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/microsite_standardization.py"
+    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/standardization/microsite_standardization.py"
     python_version  = "3"
   }
 
@@ -186,7 +172,7 @@ resource "aws_glue_job" "legacy_standardization" {
 
   command {
     name            = "glueetl"
-    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/legacy_standardization.py"
+    script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/standardization/legacy_standardization.py"
     python_version  = "3"
   }
 

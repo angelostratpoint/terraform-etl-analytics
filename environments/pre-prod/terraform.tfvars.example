@@ -5,8 +5,8 @@ environment = "pre-prod"
 
 terraform_role_arn = "arn:aws:iam::123456789012:role/cdcu-pre-prod-terraform-deployment-role"
 
-# VPC and subnet — obtain from BPI MS Cloud Engineer
-# Only one subnet needed; Glue connection requires a single AZ placement
+# VPC and subnet: obtain from BPI MS Cloud Engineer.
+# Only one subnet is needed for Glue connection placement.
 vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
 subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
 subnet_ids = [
@@ -22,7 +22,7 @@ sso_principal_arns = [
   "arn:aws:iam::123456789012:role/AWSReservedSSO_DataEngineer_xxxxxxxxxxxxxxxx"
 ]
 
-# KMS disabled in pre-prod; enable for prod
+# KMS is typically disabled in pre-prod. If enabled, provide existing_kms_key_arn.
 enable_kms    = false
 sns_topic_arn = ""
 
@@ -39,12 +39,12 @@ sagemaker_notebook_instance_count        = 0
 sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
-# IAM Mode — set to false when IAM roles are created manually (Task 3.2)
-# Set to true only if BPI MS grants sub-account IAM permissions to Terraform
+# IAM/RBAC is manually configured for this project. Keep this false.
 manage_iam = false
 
-# Pre-existing role ARNs — required when manage_iam = false
-# Obtain these from BPI MS after Task 3.2 (IAM/RBAC manual setup) is complete
+# Client-managed baseline inputs from BPI MS / manual setup.
 existing_glue_execution_role_arn      = "arn:aws:iam::123456789012:role/cdcu-pre-prod-glue-execution-role"
 existing_sagemaker_execution_role_arn = "arn:aws:iam::123456789012:role/cdcu-pre-prod-sagemaker-execution-role"
 existing_quicksight_access_role_arn   = "arn:aws:iam::123456789012:role/cdcu-pre-prod-quicksight-access-role"
+existing_kms_key_arn                  = ""
+existing_security_group_id            = "sg-0123456789abcdef0"

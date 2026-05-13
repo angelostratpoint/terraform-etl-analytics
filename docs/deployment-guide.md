@@ -1,222 +1,122 @@
 # CDCU Terraform Deployment Guide
 
-## Prerequisites Checklist
+This workspace provisions only the CDCU application service layer. BPI MS / Stratpoint manually prepares IAM/RBAC, security baseline, VPC/subnets, security groups, KMS, source database access, and deployment credentials before Terraform runs.
+
+## Prerequisites
 
 Before deploying, confirm the following are in place:
 
-- [ ] AWS CLI v2 installed (`aws --version`)
-- [ ] Terraform >= 1.6.0 installed (`terraform version`)
-- [ ] Git installed (`git --version`)
+- [ ] AWS CLI v2 installed
+- [ ] Terraform >= 1.6.0 installed
 - [ ] AWS SSO profile configured for the target environment
-- [ ] VPC ID and subnet ID obtained from BPI MS Cloud Engineer
-- [ ] GitHub repository cloned locally
-- [ ] Bootstrap script executed for the target environment
+- [ ] Remote state bucket and lock table bootstrapped, if not already created
+- [ ] BPI MS provided VPC ID, subnet ID, security group ID, and availability zone
+- [ ] BPI MS / Stratpoint provided Glue and SageMaker execution role ARNs
+- [ ] Existing KMS key ARN provided when `enable_kms = true`
+- [ ] Required Secrets Manager secrets already created
+- [ ] GitHub environment named `prod` created with at least one required reviewer
 
----
+## Manual Baseline Inputs
 
-## Step 1 — AWS CLI and SSO Configuration
+Fill these in `terraform.tfvars` for each environment:
 
-```bash
-# Configure SSO profile (run once per environment)
-aws configure sso --profile cdcu-pre-prod-profile
+| Variable | Source |
+|---|---|
+| `terraform_role_arn` | BPI MS / deployment access setup |
+| `vpc_id` | BPI MS network baseline |
+| `subnet_id` / `subnet_ids` | BPI MS network baseline |
+| `availability_zone` | Must match the Glue subnet |
+| `existing_security_group_id` | BPI MS network/security baseline |
+| `existing_glue_execution_role_arn` | Manual IAM/RBAC setup |
+| `existing_sagemaker_execution_role_arn` | Manual IAM/RBAC setup |
+| `existing_quicksight_access_role_arn` | Manual IAM/RBAC setup, if required |
+| `existing_kms_key_arn` | Manual KMS baseline, required when KMS is enabled |
+| `git_repository_url` | GitHub repository URL for SageMaker code repository |
+| `quicksight_admin_principal_arn` | Existing QuickSight user/group owner, if not using Terraform-created group |
 
-# Authenticate (run at the start of each working session)
-aws sso login --profile cdcu-pre-prod-profile
+Terraform checks the required external IDs and ARNs before provisioning CDCU services.
 
-# Verify identity
-aws sts get-caller-identity --profile cdcu-pre-prod-profile
+## Required Secrets
+
+Glue connections reference these existing Secrets Manager secret names:
+
+```text
+cdcu/{environment}/microsite-mysql-connection
+cdcu/{environment}/legacy-mysql-connection
 ```
 
----
+Terraform does not create secret values and does not read `secret_string`, so database credentials are not stored in Terraform state. BPI MS / authorized operators should create and populate these secrets outside Terraform.
 
-## Step 2 — Bootstrap Remote State (First Time Only)
-
-```bash
-cd bootstrap
-chmod +x bootstrap.sh
-
-./bootstrap.sh pre-prod cdcu-pre-prod-profile
-./bootstrap.sh prod     cdcu-prod-profile
-```
-
-Verify the bootstrap created:
-- S3 bucket: `cdcu-terraform-state-{env}`
-- DynamoDB table: `cdcu-terraform-locks-{env}`
-
----
-
-## Step 3 — Configure Environment Variables
+## Deployment
 
 ```bash
 cd environments/pre-prod
 cp terraform.tfvars.example terraform.tfvars
-```
+# Edit terraform.tfvars with BPI MS provided values
 
-Edit `terraform.tfvars` and fill in:
-
-| Variable | Where to Get It |
-|----------|----------------|
-| `terraform_role_arn` | BPI MS Cloud Engineer |
-| `vpc_id` | BPI MS Cloud Engineer |
-| `subnet_id` | BPI MS Cloud Engineer |
-| `availability_zone` | Must match the subnet's AZ |
-| `github_org` | Your GitHub organization name |
-| `github_repo` | This repository name |
-| `sso_principal_arns` | AWS IAM Identity Center console |
-| `git_repository_url` | This repository's HTTPS clone URL |
-| `sns_topic_arn` | Create SNS topic or leave empty |
-
----
-
-## Step 4 — Initialize Terraform
-
-```bash
-cd environments/pre-prod
 terraform init
-```
-
-Expected output:
-```
-Initializing the backend...
-Successfully configured the backend "s3"!
-Initializing modules...
-Terraform has been successfully initialized!
-```
-
----
-
-## Step 5 — Validate and Plan
-
-```bash
-# Format check
 terraform fmt -check -recursive ../../
-
-# Validate configuration
 terraform validate
-
-# Generate plan
 terraform plan -var-file="terraform.tfvars" -out=tfplan
-```
-
-Review the plan output carefully. Confirm:
-- Resource count matches expectations
-- No unexpected destroys
-- Naming follows `cdcu-{env}-` convention
-- Tags are applied to all resources
-- Artifact upload count matches files in `artifacts/`
-
----
-
-## Step 6 — Apply
-
-```bash
 terraform apply tfplan
 ```
 
----
+For production, run the same flow from `environments/prod`.
 
-## Step 7 — Post-Deployment Validation
+## Post-Deployment Checks
 
 ```bash
-# Verify outputs
 terraform output
 
-# Validate S3 bucket exists
 aws s3 ls s3://cdcu-pre-prod-data-lake --profile cdcu-pre-prod-profile
 
-# Validate Athena workgroup
-aws athena get-work-group \
-  --work-group cdcu-pre-prod-workgroup \
-  --region ap-southeast-1 \
-  --profile cdcu-pre-prod-profile
-
-# Validate Glue catalog database
 aws glue get-database \
   --name cdcu_pre_prod_catalog \
   --region ap-southeast-1 \
   --profile cdcu-pre-prod-profile
 
-# Validate artifacts were uploaded
+aws athena get-work-group \
+  --work-group cdcu-pre-prod-workgroup \
+  --region ap-southeast-1 \
+  --profile cdcu-pre-prod-profile
+
 aws s3 ls s3://cdcu-pre-prod-data-lake/pre-prod/glue-scripts/ \
   --profile cdcu-pre-prod-profile
 ```
 
----
+## DE Script Uploads
 
-## Step 8 — Populate Secrets
+DE-owned scripts are stored in the codebase and uploaded to S3 during `terraform apply`.
 
-After deployment, populate the MySQL connection secret. **Never put credentials in Terraform files.**
+| Local path | S3 prefix |
+|---|---|
+| `artifacts/glue/extraction/*.py` | `{env}/glue-scripts/extraction/` |
+| `artifacts/glue/standardization/*.py` | `{env}/glue-scripts/standardization/` |
+| `artifacts/sagemaker/matching/*.py` | `{env}/sagemaker-scripts/matching/` |
+| `artifacts/sagemaker/processing/*.py` | `{env}/sagemaker-scripts/processing/` |
+| `artifacts/sql/athena/*.sql` | `{env}/sql/` |
 
-```bash
-aws secretsmanager put-secret-value \
-  --secret-id "cdcu/pre-prod/mysql-connection" \
-  --secret-string '{
-    "host": "actual-mysql-host",
-    "port": "3306",
-    "dbname": "actual-db-name",
-    "username": "actual-username",
-    "password": "actual-password"
-  }' \
-  --region ap-southeast-1 \
-  --profile cdcu-pre-prod-profile
-```
+Empty directories containing only README files produce zero S3 objects. That is expected until DEs add scripts.
 
----
+## GitHub Environment Protection Rule
 
-## Environment Promotion Workflow
+The `terraform-apply.yml` workflow sets `environment: ${{ needs.detect-environment.outputs.environment }}` on the apply job. When the detected environment is `prod`, GitHub evaluates the protection rules configured for the `prod` environment before allowing the job to run.
 
-```
-pre-prod → prod
-```
+To set it up:
 
-1. Create a PR from `feature/prod-*` targeting `main`
-2. CI runs `terraform plan` and posts output as PR comment
-3. Peer reviewer approves the PR
-4. Merge with commit message containing `[env:prod]` triggers apply to prod
-5. GitHub environment protection rules require manual approval before prod apply proceeds
+1. Go to repository Settings -> Environments.
+2. Create an environment named exactly `prod`.
+3. Enable Required reviewers and add at least one reviewer or team.
+4. Save the environment.
 
----
+Without this GitHub environment protection rule, a push to `main` with `[env:prod]` in the commit message can apply to production without an approval gate.
 
-## Rollback Procedure
+## Rollback
 
-If an apply causes issues:
+Prefer reverting the Terraform change and applying a new plan. For emergency pre-prod cleanup only, targeted destroy can be used:
 
 ```bash
-# Option 1: Revert to previous state version
-aws s3 ls s3://cdcu-terraform-state-pre-prod/cdcu/pre-prod/ \
-  --profile cdcu-pre-prod-profile
-# Identify the previous state version and restore it
-
-# Option 2: Terraform destroy specific resources
 terraform destroy -target=module.glue -var-file="terraform.tfvars"
-
-# Option 3: Full environment destroy (DESTRUCTIVE — use only in pre-prod)
-terraform destroy -var-file="terraform.tfvars"
 ```
 
----
-
-## Simulated Deployment Output
-
-```
-module.iam.aws_iam_role.cdcu_glue_execution: Creating...
-module.iam.aws_iam_role.cdcu_sagemaker_execution: Creating...
-module.s3.aws_s3_bucket.cdcu_data_lake: Creating...
-module.secrets_manager.aws_secretsmanager_secret.mysql_connection: Creating...
-module.cloudwatch.aws_cloudwatch_log_group.glue: Creating...
-module.artifacts.aws_s3_object.glue_scripts["microsite_raw_extraction.py"]: Creating...
-...
-Apply complete! Resources: 52 added, 0 changed, 0 destroyed.
-
-Outputs:
-data_lake_bucket_name    = "cdcu-pre-prod-data-lake"
-athena_workgroup_name    = "cdcu-pre-prod-workgroup"
-glue_catalog_database    = "cdcu_pre_prod_catalog"
-cloudwatch_dashboard     = "cdcu-pre-prod-operations"
-artifacts_uploaded = {
-  glue      = 4
-  matching  = 2
-  sagemaker = 1
-  sql       = 3
-}
-```
+Avoid full environment destroy in production.

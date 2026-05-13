@@ -23,14 +23,33 @@ output "glue_crawler_names" {
   value       = module.glue.crawler_names
 }
 
-output "iam_role_arns" {
-  description = "All CDCU IAM role ARNs"
-  value       = module.iam.all_role_arns
+output "external_role_arns" {
+  description = "Client-managed IAM role ARNs consumed by this Terraform deployment"
+  value = {
+    glue_execution       = var.existing_glue_execution_role_arn
+    sagemaker_execution  = var.existing_sagemaker_execution_role_arn
+    quicksight_access    = var.existing_quicksight_access_role_arn
+  }
 }
 
-output "cloudwatch_dashboard" {
-  description = "CloudWatch operations dashboard name"
-  value       = module.cloudwatch.dashboard_name
+output "glue_execution_role_arn" {
+  description = "Client-managed Glue execution role ARN"
+  value       = var.existing_glue_execution_role_arn
+}
+
+output "sagemaker_execution_role_arn" {
+  description = "Client-managed SageMaker execution role ARN"
+  value       = var.existing_sagemaker_execution_role_arn
+}
+
+output "kms_key_arn" {
+  description = "Client-managed KMS key ARN used when KMS encryption is enabled"
+  value       = local.kms_key_arn
+}
+
+output "glue_security_group_id" {
+  description = "Client-managed Glue security group ID to whitelist in the RDS inbound rules"
+  value       = var.existing_security_group_id
 }
 
 output "sagemaker_studio_domain_id" {
@@ -65,9 +84,10 @@ output "quicksight_group_arns" {
 output "artifacts_uploaded" {
   description = "Count of artifacts uploaded per category"
   value = {
-    glue      = module.artifacts.glue_script_count
-    sagemaker = module.artifacts.sagemaker_script_count
-    sql       = module.artifacts.sql_file_count
-    matching  = module.artifacts.matching_script_count
+    glue_extraction      = module.artifacts.glue_extraction_script_count
+    glue_standardization = module.artifacts.glue_standardization_script_count
+    sagemaker_matching   = module.artifacts.sagemaker_matching_script_count
+    sagemaker_processing = module.artifacts.sagemaker_processing_script_count
+    sql                  = module.artifacts.sql_file_count
   }
 }

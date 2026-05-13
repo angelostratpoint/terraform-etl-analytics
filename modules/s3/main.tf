@@ -6,7 +6,8 @@ resource "aws_s3_bucket" "cdcu_data_lake" {
   bucket = local.bucket_name
 
   tags = merge(var.tags, {
-    Name = local.bucket_name
+    Name               = local.bucket_name
+    DataClassification = "PII"
   })
 }
 
@@ -49,19 +50,7 @@ resource "aws_s3_bucket_policy" "cdcu_data_lake" {
         Sid       = "DenyNonHTTPS"
         Effect    = "Deny"
         Principal = "*"
-        Action    = "s3:PutObject"
-        Resource  = "${aws_s3_bucket.cdcu_data_lake.arn}/*"
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "false"
-          }
-        }
-      },
-      {
-        Sid       = "DenyHTTPGetObject"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:GetObject"
+        Action    = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
         Resource  = "${aws_s3_bucket.cdcu_data_lake.arn}/*"
         Condition = {
           Bool = {
@@ -191,7 +180,8 @@ resource "aws_s3_bucket" "cdcu_athena_results" {
   bucket = "cdcu-${var.environment}-athena-results"
 
   tags = merge(var.tags, {
-    Name = "cdcu-${var.environment}-athena-results"
+    Name               = "cdcu-${var.environment}-athena-results"
+    DataClassification = "Internal"
   })
 }
 
@@ -239,4 +229,28 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_athena_results" {
       days = 30
     }
   }
+}
+
+resource "aws_s3_bucket_policy" "cdcu_athena_results" {
+  bucket = aws_s3_bucket.cdcu_athena_results.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyNonHTTPS"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Resource  = "${aws_s3_bucket.cdcu_athena_results.arn}/*"
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+    ]
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.cdcu_athena_results]
 }

@@ -5,7 +5,7 @@ environment = "prod"
 
 terraform_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-terraform-deployment-role"
 
-# VPC and subnet — obtain from BPI MS Cloud Engineer
+# VPC and subnet: obtain from BPI MS Cloud Engineer.
 vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
 subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
 subnet_ids = [
@@ -22,11 +22,11 @@ sso_principal_arns = [
   "arn:aws:iam::123456789012:role/AWSReservedSSO_DataEngineer_xxxxxxxxxxxxxxxx"
 ]
 
-# KMS always enabled in prod
+# KMS is enabled in prod and must use a BPI MS managed key.
 enable_kms    = true
 sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:cdcu-prod-alerts"
 
-# Higher worker counts for 1M record processing
+# Higher worker counts for 1M record processing.
 glue_worker_count = 10
 glue_worker_type  = "G.1X"
 
@@ -41,10 +41,12 @@ sagemaker_notebook_instance_count        = 4
 sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
-# IAM Mode — set to false when IAM roles are created manually (Task 3.2)
+# IAM/RBAC is manually configured for this project. Keep this false.
 manage_iam = false
 
-# Pre-existing role ARNs — required when manage_iam = false
+# Client-managed baseline inputs from BPI MS / manual setup.
 existing_glue_execution_role_arn      = "arn:aws:iam::123456789012:role/cdcu-prod-glue-execution-role"
 existing_sagemaker_execution_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-sagemaker-execution-role"
 existing_quicksight_access_role_arn   = "arn:aws:iam::123456789012:role/cdcu-prod-quicksight-access-role"
+existing_kms_key_arn                  = "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+existing_security_group_id            = "sg-0123456789abcdef0"

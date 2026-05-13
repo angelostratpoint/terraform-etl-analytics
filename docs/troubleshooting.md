@@ -75,9 +75,15 @@ aws secretsmanager list-secrets \
   --region ap-southeast-1 \
   --profile cdcu-{env}-profile
 
-# Create the secret if missing (Terraform should have created it — check apply output)
+# Ask the authorized BPI MS / Stratpoint operator to create missing secrets.
 aws secretsmanager create-secret \
-  --name "cdcu/{env}/mysql-connection" \
+  --name "cdcu/{env}/microsite-mysql-connection" \
+  --secret-string '{"host":"","port":"3306","dbname":"","username":"","password":""}' \
+  --region ap-southeast-1 \
+  --profile cdcu-{env}-profile
+
+aws secretsmanager create-secret \
+  --name "cdcu/{env}/legacy-mysql-connection" \
   --secret-string '{"host":"","port":"3306","dbname":"","username":"","password":""}' \
   --region ap-southeast-1 \
   --profile cdcu-{env}-profile

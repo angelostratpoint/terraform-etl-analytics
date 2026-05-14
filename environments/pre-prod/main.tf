@@ -46,11 +46,24 @@ module "s3" {
   tags        = local.common_tags
 }
 
+module "iam" {
+  source = "../../modules/iam"
+
+  environment               = local.environment
+  data_lake_bucket_arn      = module.s3.data_lake_bucket_arn
+  athena_results_bucket_arn = module.s3.athena_results_bucket_arn
+  athena_workgroup_name     = "cdcu-${local.environment}-workgroup"
+  terraform_lock_table_name = var.terraform_lock_table_name
+  tags                      = local.common_tags
+
+  depends_on = [module.s3]
+}
+
 module "glue" {
   source = "../../modules/glue"
 
   environment             = local.environment
-  glue_execution_role_arn = var.existing_glue_execution_role_arn
+  glue_execution_role_arn = module.iam.glue_execution_role_arn
   data_lake_bucket        = module.s3.data_lake_bucket_name
   scripts_bucket          = module.s3.data_lake_bucket_name
   glue_security_group_ids = [var.existing_security_group_id]
@@ -60,7 +73,7 @@ module "glue" {
   glue_worker_type        = var.glue_worker_type
   tags                    = local.common_tags
 
-  depends_on = [terraform_data.manual_baseline_contract]
+  depends_on = [terraform_data.manual_baseline_contract, module.iam]
 }
 
 module "athena" {
@@ -84,14 +97,14 @@ module "sagemaker" {
   vpc_id                         = var.vpc_id
   subnet_ids                     = local.subnet_ids
   security_group_ids             = [var.existing_security_group_id]
-  execution_role_arn             = var.existing_sagemaker_execution_role_arn
+  execution_role_arn             = module.iam.sagemaker_execution_role_arn
   studio_user_profile_names      = var.sagemaker_studio_user_profile_names
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
   notebook_instance_count        = var.sagemaker_notebook_instance_count
   notebook_instance_type         = var.sagemaker_notebook_instance_type
   tags                           = local.common_tags
 
-  depends_on = [terraform_data.manual_baseline_contract]
+  depends_on = [terraform_data.manual_baseline_contract, module.iam]
 }
 
 module "quicksight" {

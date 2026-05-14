@@ -136,6 +136,12 @@ variable "quicksight_spice_capacity_gb" {
 # those existing IDs and ARNs while provisioning the CDCU application services.
 ###############################################################################
 
+variable "terraform_lock_table_name" {
+  description = "Name of the DynamoDB table used for Terraform state locking"
+  type        = string
+  default     = "cdcu-terraform-state-lock"
+}
+
 variable "manage_iam" {
   description = <<-EOT
     Deprecated compatibility flag. Environment roots no longer create IAM roles

@@ -58,7 +58,6 @@ Assumed by `glue.amazonaws.com`. Used by all Glue ETL jobs and crawlers.
 | `GlueCrawlerAndETL` | Glue | Full crawler, job, catalog, connection actions (see note below) | `*` |
 | `SecretsManagerRead` | Secrets Manager | GetSecretValue, DescribeSecret | `cdcu/{env}/*` secrets |
 | `CloudWatchLogsGlue` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/glue/*` log groups |
-| `VPCPlacement` | EC2 | DescribeVpcs, DescribeSubnets, DescribeSecurityGroups, DescribeNetworkInterfaces, CreateNetworkInterface, DeleteNetworkInterface, DescribeVpcEndpoints | `*` (read-only, no create/modify network) |
 
 > Note on Glue actions: `glue:GetCatalog`, `glue:CreateCatalog`, `glue:DeleteCatalog`,
 > and `glue:UpdateCatalog` are **not valid IAM actions** and are excluded from the
@@ -77,7 +76,6 @@ jobs, training jobs, and pipelines.
 | `SageMakerPassRole` | IAM | PassRole | `ST-CDCU-SageMakerExecutionRole` ARN only, condition: `iam:PassedToService = sagemaker.amazonaws.com` |
 | `S3DataLakeAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-data-lake` bucket |
 | `CloudWatchLogsSageMaker` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/sagemaker/*` log groups |
-| `VPCPlacement` | EC2 | Same as GlueExecutionRole | `*` (read-only, no create/modify network) |
 
 ---
 
@@ -150,29 +148,18 @@ boundary that Stratpoint does not own or modify BPI MS's account baseline.
 | Policy Sid | Denied Actions | Resource |
 |---|---|---|
 | `DenySensitiveServices` | `iam:*`, `organizations:*`, `rds:*`, `secretsmanager:CreateSecret`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:PutSecretValue`, `cloudformation:*`, `cloudshell:*` | `*` |
-| `DenyNetworkModification` | `ec2:CreateVpc`, `ec2:DeleteVpc`, `ec2:CreateSubnet`, `ec2:CreateSecurityGroup`, `ec2:AuthorizeSecurityGroupIngress`, `ec2:ModifyVpc*` | `*` |
 | `DenyOutsideRegion` | All actions where `aws:RequestedRegion != ap-southeast-1` | `*` |
 
 ---
 
 ## VPC Access Clarification
 
-Stratpoint does **not** have or need VPC console access. The EC2 actions listed under
-`VPCPlacement` are required by AWS internally so that Glue and SageMaker can place
-themselves inside BPI MS's VPC at job runtime. These are read-only describe actions
-plus ENI (Elastic Network Interface) create/delete — no VPC, subnet, or security group
-creation is permitted.
+EC2 and VPC are **outside Terraform scope** for this project per the README. Terraform
+consumes `vpc_id`, `subnet_id`, and `existing_security_group_id` as input values only.
+No EC2 resources are created, modified, or referenced in any IAM policy.
 
-| EC2 Action | Why it is needed |
-|---|---|
-| `DescribeVpcs`, `DescribeSubnets`, `DescribeSecurityGroups` | Glue/SageMaker validates VPC placement before starting a job |
-| `DescribeNetworkInterfaces` | Checks existing ENIs in the subnet |
-| `CreateNetworkInterface`, `DeleteNetworkInterface` | Glue/SageMaker creates a temporary ENI inside the VPC when a job runs, then removes it when done |
-| `DescribeVpcEndpoints` | Required when S3/Glue traffic routes through VPC endpoints |
-
-BPI MS provides the VPC ID, subnet ID, and security group ID as input values in
-`terraform.tfvars`. Stratpoint references these IDs only — no network resources are
-created or modified.
+BPI MS owns and manages all network resources. Stratpoint has confirmed that EC2 actions
+are blocked at the account level for Stratpoint IAM users.
 
 ---
 
@@ -219,5 +206,4 @@ Before running `terraform apply` on the IAM module:
 - [ ] Confirm Terraform lock table name (default: `cdcu-terraform-state-lock`)
 - [ ] Confirm `q:PassRequest` removal is acknowledged — it is not a valid IAM action
 - [ ] Confirm Secrets Manager write/delete access is **not** granted to Stratpoint roles — BPI MS owns secret values
-- [ ] Confirm VPC read-only EC2 permissions are acceptable for Glue and SageMaker runtime placement
 - [ ] Provide CE access to Stratpoint once scripts are reviewed and approved

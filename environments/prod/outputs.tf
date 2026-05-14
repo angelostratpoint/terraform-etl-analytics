@@ -26,20 +26,30 @@ output "glue_crawler_names" {
 output "external_role_arns" {
   description = "Client-managed IAM role ARNs consumed by this Terraform deployment"
   value = {
-    glue_execution       = var.existing_glue_execution_role_arn
-    sagemaker_execution  = var.existing_sagemaker_execution_role_arn
-    quicksight_access    = var.existing_quicksight_access_role_arn
+    glue_execution      = module.iam.glue_execution_role_arn
+    sagemaker_execution = module.iam.sagemaker_execution_role_arn
+    athena_query        = module.iam.athena_query_role_arn
+    quicksight_access   = var.existing_quicksight_access_role_arn
   }
 }
 
 output "glue_execution_role_arn" {
-  description = "Client-managed Glue execution role ARN"
-  value       = var.existing_glue_execution_role_arn
+  description = "ST-CDCU Glue execution role ARN"
+  value       = module.iam.glue_execution_role_arn
 }
 
 output "sagemaker_execution_role_arn" {
-  description = "Client-managed SageMaker execution role ARN"
-  value       = var.existing_sagemaker_execution_role_arn
+  description = "ST-CDCU SageMaker execution role ARN"
+  value       = module.iam.sagemaker_execution_role_arn
+}
+
+output "iam_groups" {
+  description = "ST-CDCU IAM group names"
+  value = {
+    cloud_engineering = module.iam.cloud_engineering_group_name
+    data_engineering  = module.iam.data_engineering_group_name
+    qa                = module.iam.qa_group_name
+  }
 }
 
 output "kms_key_arn" {

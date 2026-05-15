@@ -110,6 +110,47 @@ To set it up:
 
 Without this GitHub environment protection rule, a push to `main` with `[env:prod]` in the commit message can apply to production without an approval gate.
 
+## Fresh Machine Setup
+
+When cloning this repository on a new machine, the following are **not included** in the repo and must be set up manually before `terraform plan` will work:
+
+| Missing Item | Why | Fix |
+|---|---|---|
+| `terraform.tfvars` | Gitignored — contains real credentials and IDs | Copy from `terraform.tfvars.example` and fill in values |
+| `.terraform/` directory | Gitignored — contains downloaded provider plugins | Run `terraform init` |
+| AWS credentials | Machine-specific | Run `aws sso login` or `aws configure` |
+| Terraform CLI | Must be installed | Install >= 1.6.0 from https://developer.hashicorp.com/terraform/install |
+
+Step-by-step for a fresh clone:
+
+```powershell
+# 1. Clone and switch to the working branch
+git clone https://github.com/angelostratpoint/terraform-etl-analytics.git
+cd terraform-etl-analytics
+git checkout codex-client-governed-service-scope-v2
+
+# 2. Authenticate to AWS
+aws sso login --profile your-profile
+# or
+aws configure
+
+# 3. Create terraform.tfvars from the example
+cd environments/pre-prod
+copy terraform.tfvars.example terraform.tfvars
+# Fill in all real values — VPC, subnet, SG, role ARN, JDBC URLs
+
+# 4. Initialize Terraform
+terraform init
+
+# 5. Validate and plan
+terraform validate
+terraform plan -var-file="terraform.tfvars" -out=tfplan
+```
+
+> Note: Since resources are already provisioned in AWS, `terraform apply` on a fresh clone will not recreate anything. Terraform reads the remote state from S3 (`cdcu-terraform-state-pre-prod`) and confirms existing resources match the configuration. Any machine with the correct `terraform.tfvars` and AWS credentials can manage the same infrastructure.
+
+---
+
 ## Rollback
 
 Prefer reverting the Terraform change and applying a new plan. For emergency pre-prod cleanup only, targeted destroy can be used:

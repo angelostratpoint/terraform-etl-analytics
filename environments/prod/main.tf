@@ -61,6 +61,8 @@ module "glue" {
   availability_zone       = var.availability_zone
   glue_worker_count       = var.glue_worker_count
   glue_worker_type        = var.glue_worker_type
+  microsite_jdbc_url      = var.microsite_jdbc_url
+  legacy_jdbc_url         = var.legacy_jdbc_url
   tags                    = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]
@@ -90,8 +92,8 @@ module "sagemaker" {
   execution_role_arn             = module.iam.sagemaker_execution_role_arn
   studio_user_profile_names      = var.sagemaker_studio_user_profile_names
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
-  notebook_instance_count        = var.sagemaker_notebook_instance_count
-  notebook_instance_type         = var.sagemaker_notebook_instance_type
+  studio_space_instance_type     = var.sagemaker_studio_space_instance_type
+  studio_space_volume_size_gb    = var.sagemaker_studio_space_volume_size_gb
   tags                           = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]

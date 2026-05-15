@@ -48,6 +48,16 @@ variable "glue_worker_type" {
   default     = "G.1X"
 }
 
+variable "microsite_jdbc_url" {
+  description = "JDBC URL for the Microsite MySQL source database"
+  type        = string
+}
+
+variable "legacy_jdbc_url" {
+  description = "JDBC URL for the Legacy MySQL source database"
+  type        = string
+}
+
 variable "tags" {
   description = "Common resource tags"
   type        = map(string)

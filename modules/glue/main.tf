@@ -18,7 +18,7 @@ resource "aws_glue_connection" "microsite_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://localhost:3306/test"
+    JDBC_CONNECTION_URL = var.microsite_jdbc_url
     SECRET_ID           = "cdcu/${var.environment}/microsite-mysql-connection"
   }
 
@@ -39,7 +39,7 @@ resource "aws_glue_connection" "legacy_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://localhost:3306/test"
+    JDBC_CONNECTION_URL = var.legacy_jdbc_url
     SECRET_ID           = "cdcu/${var.environment}/legacy-mysql-connection"
   }
 

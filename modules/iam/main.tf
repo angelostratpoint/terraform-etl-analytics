@@ -186,7 +186,9 @@ resource "aws_iam_policy" "glue_cloudwatch" {
       ]
       Resource = [
         "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*"
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*"
       ]
     }]
   })
@@ -267,17 +269,6 @@ resource "aws_iam_policy" "sagemaker_access" {
           "sagemaker:AddTags", "sagemaker:ListTags", "sagemaker:DeleteTags"
         ]
         Resource = "*"
-      },
-      {
-        Sid    = "SageMakerPassRole"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
-        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
-        Condition = {
-          StringEquals = {
-            "iam:PassedToService" = "sagemaker.amazonaws.com"
-          }
-        }
       }
     ]
   })
@@ -324,7 +315,10 @@ resource "aws_iam_policy" "sagemaker_cloudwatch" {
         "logs:DescribeLogStreams",
         "logs:GetLogEvents"
       ]
-      Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*"
+      Resource = [
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
+      ]
     }]
   })
 
@@ -482,7 +476,7 @@ resource "aws_iam_policy" "ce_eventbridge" {
         "events:ListRules",
         "events:ListTargetsByRule"
       ]
-      Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/*"
+      Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
     }]
   })
 
@@ -494,18 +488,51 @@ resource "aws_iam_policy" "ce_amazon_q" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "AmazonQDeveloperAccess"
-      Effect = "Allow"
-      Action = [
-        "q:SendMessage",
-        "q:StartConversation",
-        "q:GetConversation",
-        "q:ListConversations",
-        "q:DeleteConversation"
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid    = "AmazonQConsoleAssistantOnly"
+        Effect = "Allow"
+        Action = [
+          "q:SendMessage",
+          "q:StartConversation",
+          "q:GetConversation",
+          "q:ListConversations",
+          "q:DeleteConversation"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "AllowSTSContextForQ"
+        Effect   = "Allow"
+        Action   = ["sts:SetContext"]
+        Resource = "arn:aws:sts::*:self"
+      },
+      {
+        Sid    = "ExplicitlyDenyQAdministrativeFunctions"
+        Effect = "Deny"
+        Action = [
+          "q:CreateAssignment",
+          "q:DeleteAssignment",
+          "q:CreatePlugin",
+          "q:UpdatePlugin",
+          "q:DeletePlugin",
+          "q:GetPlugin",
+          "q:UsePlugin",
+          "q:ListPlugins",
+          "q:ListPluginProviders",
+          "q:TagResource",
+          "q:UntagResource",
+          "q:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "ExplicitlyDenyCodeGenerationFeatures"
+        Effect   = "Deny"
+        Action   = ["q:GenerateCodeFromCommands"]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -546,7 +573,11 @@ resource "aws_iam_policy" "ce_cloudwatch_combined" {
       ]
       Resource = [
         "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*"
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
       ]
     }]
   })
@@ -614,19 +645,26 @@ resource "aws_iam_policy" "de_secrets" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "SecretsManagerReadAccess"
-      Effect = "Allow"
-      Action = [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-        "secretsmanager:ListSecrets",
-        "secretsmanager:ListSecretVersionIds",
-        "secretsmanager:GetResourcePolicy",
-        "secretsmanager:BatchGetSecretValue"
-      ]
-      Resource = "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.secret_prefix}*"
-    }]
+    Statement = [
+      {
+        Sid      = "SecretsManagerList"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:ListSecrets"]
+        Resource = "*"
+      },
+      {
+        Sid    = "SecretsManagerReadAccess"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecretVersionIds",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:BatchGetSecretValue"
+        ]
+        Resource = "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.secret_prefix}*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -647,7 +685,11 @@ resource "aws_iam_policy" "de_cloudwatch" {
       ]
       Resource = [
         "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*"
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
       ]
     }]
   })
@@ -740,7 +782,12 @@ resource "aws_iam_policy" "qa_access" {
           "logs:DescribeLogStreams",
           "logs:GetLogEvents"
         ]
-        Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*"
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*"
+        ]
       }
     ]
   })

@@ -67,9 +67,9 @@ output "sagemaker_studio_domain_id" {
   value       = module.sagemaker.studio_domain_id
 }
 
-output "sagemaker_notebook_instance_names" {
-  description = "SageMaker notebook instance names"
-  value       = module.sagemaker.notebook_instance_names
+output "sagemaker_studio_space_names" {
+  description = "SageMaker Studio JupyterLab space names"
+  value       = module.sagemaker.studio_space_names
 }
 
 output "quicksight_data_source_arn" {

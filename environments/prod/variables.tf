@@ -76,6 +76,26 @@ variable "glue_worker_type" {
   default     = "G.1X"
 }
 
+variable "microsite_jdbc_url" {
+  description = "JDBC URL for the BPI MS Microsite MySQL source database"
+  type        = string
+
+  validation {
+    condition     = startswith(var.microsite_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.microsite_jdbc_url)))
+    error_message = "microsite_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+  }
+}
+
+variable "legacy_jdbc_url" {
+  description = "JDBC URL for the BPI MS Legacy MySQL source database"
+  type        = string
+
+  validation {
+    condition     = startswith(var.legacy_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.legacy_jdbc_url)))
+    error_message = "legacy_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+  }
+}
+
 variable "git_repository_url" {
   description = "HTTPS URL of the GitHub repository for SageMaker code repository"
   type        = string
@@ -93,16 +113,16 @@ variable "sagemaker_studio_user_profile_names" {
   default     = ["data-scientist-01", "data-scientist-02"]
 }
 
-variable "sagemaker_notebook_instance_count" {
-  description = "Number of classic on-demand SageMaker notebook instances"
-  type        = number
-  default     = 4
+variable "sagemaker_studio_space_instance_type" {
+  description = "Instance type for the JupyterLab space in Unified Studio"
+  type        = string
+  default     = "ml.t3.medium"
 }
 
-variable "sagemaker_notebook_instance_type" {
-  description = "Classic SageMaker notebook instance type"
-  type        = string
-  default     = "ml.c4.2xlarge"
+variable "sagemaker_studio_space_volume_size_gb" {
+  description = "EBS volume size in GB for the JupyterLab space"
+  type        = number
+  default     = 5
 }
 
 variable "sagemaker_studio_app_network_access_type" {

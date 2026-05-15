@@ -61,6 +61,8 @@ module "glue" {
   availability_zone       = var.availability_zone
   glue_worker_count       = var.glue_worker_count
   glue_worker_type        = var.glue_worker_type
+  microsite_jdbc_url      = var.microsite_jdbc_url
+  legacy_jdbc_url         = var.legacy_jdbc_url
   tags                    = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]

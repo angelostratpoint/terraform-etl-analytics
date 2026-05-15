@@ -140,8 +140,8 @@ Blocks of type "permission" are not expected here.
 **Error:**
 ```
 Error: Cannot assume IAM Role
-IAM Role (arn:aws:iam::392749560093:user/test-angelo) cannot be assumed.
-Error: operation error STS: AssumeRole, AccessDenied: User is not authorized to perform sts:AssumeRole on resource: arn:aws:iam::392749560093:user/test-angelo
+IAM Role (arn:aws:iam::<account-id>:user/<terraform-operator>) cannot be assumed.
+Error: operation error STS: AssumeRole, AccessDenied: User is not authorized to perform sts:AssumeRole on resource: arn:aws:iam::<account-id>:user/<terraform-operator>
 ```
 
 **Cause:** The `terraform_role_arn` variable in `terraform.tfvars` was set to an IAM **user** ARN. The `assume_role` block in `providers.tf` requires an IAM **role** ARN. You cannot assume a user.
@@ -227,7 +227,7 @@ LimitExceeded: Cannot exceed quota for PoliciesPerGroup: 10
 
 **Error:**
 ```
-Error: attaching IAM Policy (arn:aws:iam::392749560093:policy/ST-CDCU-pre-prod-CECloudWatchLogsAccess) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
+Error: attaching IAM Policy (arn:aws:iam::<account-id>:policy/ST-CDCU-pre-prod-CECloudWatchLogsAccess) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
 LimitExceeded: Cannot exceed quota for PoliciesPerGroup: 10
 ```
 
@@ -253,7 +253,7 @@ Step 1 — Detach the policy manually via AWS CLI:
 ```powershell
 aws iam detach-group-policy `
   --group-name ST-CDCU-pre-prod-CloudEngineering `
-  --policy-arn arn:aws:iam::392749560093:policy/ST-CDCU-pre-prod-AmazonQDeveloperAccess
+  --policy-arn arn:aws:iam::<account-id>:policy/ST-CDCU-pre-prod-AmazonQDeveloperAccess
 ```
 
 Step 2 — Remove the `ce_amazon_q` group attachment from `modules/iam/main.tf` so Terraform does not re-add it.
@@ -319,7 +319,7 @@ aws secretsmanager create-secret `
 Expected output after successful creation:
 ```json
 {
-  "ARN": "arn:aws:secretsmanager:ap-southeast-1:392749560093:secret:cdcu/pre-prod/microsite-mysql-connection-xjffir",
+  "ARN": "arn:aws:secretsmanager:ap-southeast-1:<account-id>:secret:cdcu/pre-prod/microsite-mysql-connection-xjffir",
   "Name": "cdcu/pre-prod/microsite-mysql-connection",
   "VersionId": "9784ae1d-f891-4ffc-b802-98243d7bfd29"
 }
@@ -402,7 +402,7 @@ sagemaker:ListUserProfiles, sagemaker:DescribeUserProfile
 The policy was updated immediately via AWS CLI without waiting for `terraform apply`:
 ```powershell
 aws iam create-policy-version `
-  --policy-arn arn:aws:iam::392749560093:policy/ST-CDCU-pre-prod-SageMakerAccess `
+  --policy-arn arn:aws:iam::<account-id>:policy/ST-CDCU-pre-prod-SageMakerAccess `
   --set-as-default `
   --policy-document '{...updated policy JSON...}'
 ```
@@ -456,9 +456,9 @@ terraform apply tfplan
 
 **Error:**
 ```
-User: arn:aws:sts::392749560093:assumed-role/ST-CDCU-pre-prod-SageMakerExecutionRole/SageMaker
+User: arn:aws:sts::<account-id>:assumed-role/ST-CDCU-pre-prod-SageMakerExecutionRole/SageMaker
 is not authorized to perform: sagemaker:AddTags on resource:
-arn:aws:sagemaker:ap-southeast-1:392749560093:space/d-hmatlfotlt4l/quickstart-cpu-smald9
+arn:aws:sagemaker:ap-southeast-1:<account-id>:space/d-hmatlfotlt4l/quickstart-cpu-smald9
 because no identity-based policy allows the sagemaker:AddTags action
 ```
 
@@ -495,11 +495,11 @@ terraform apply tfplan
 
 **Error:**
 ```
-Error: attaching IAM Policy (arn:aws:iam::392749560093:policy/ST-CDCU-pre-prod-SageMakerCloudWatchLogs) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
+Error: attaching IAM Policy (arn:aws:iam::<account-id>:policy/ST-CDCU-pre-prod-SageMakerCloudWatchLogs) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
 operation error IAM: AttachGroupPolicy, https response error StatusCode: 409,
 LimitExceeded: Cannot exceed quota for PoliciesPerGroup: 10
 
-Error: attaching IAM Policy (arn:aws:iam::392749560093:policy/ST-CDCU-pre-prod-AmazonQDeveloperAccess) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
+Error: attaching IAM Policy (arn:aws:iam::<account-id>:policy/ST-CDCU-pre-prod-AmazonQDeveloperAccess) to IAM Group (ST-CDCU-pre-prod-CloudEngineering):
 operation error IAM: AttachGroupPolicy, https response error StatusCode: 409,
 LimitExceeded: Cannot exceed quota for PoliciesPerGroup: 10
 ```
@@ -829,7 +829,7 @@ ownership_settings {
 **Error:**
 ```
 Failed to call ec2:DescribeSubnets: You are not authorized to perform this operation.
-User: arn:aws:sts::392749560093:assumed-role/ST-CDCU-pre-prod-GlueExecutionRole/GlueJobRunnerSession
+User: arn:aws:sts::<account-id>:assumed-role/ST-CDCU-pre-prod-GlueExecutionRole/GlueJobRunnerSession
 is not authorized to perform: ec2:DescribeSubnets because no identity-based policy allows the
 ec2:DescribeSubnets action
 VPC Id not found for subnet subnet-0d3103b0eba8bb171 and availability zone ap-southeast-1a
@@ -940,7 +940,7 @@ aws glue start-job-run `
 **Error:**
 ```
 Service Principal: glue.amazonaws.com is not authorized to perform: logs:PutLogEvents
-on resource: arn:aws:logs:ap-southeast-1:392749560093:log-group:/aws-glue/crawlers:log-stream:
+on resource: arn:aws:logs:ap-southeast-1:<account-id>:log-group:/aws-glue/crawlers:log-stream:
 cdcu-pre-prod-processed-matching-crawler because no identity-based policy allows the
 logs:PutLogEvents action
 ```
@@ -990,7 +990,7 @@ aws glue start-crawler `
 **Error:**
 ```
 Service Principal: glue.amazonaws.com is not authorized to perform: glue:BatchGetPartition
-on resource: arn:aws:glue:ap-southeast-1:392749560093:catalog
+on resource: arn:aws:glue:ap-southeast-1:<account-id>:catalog
 because no identity-based policy allows the glue:BatchGetPartition action
 (Database name: cdcu_pre-prod_catalog, Table name: matching)
 ```

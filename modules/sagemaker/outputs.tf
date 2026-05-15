@@ -23,7 +23,7 @@ output "studio_user_profiles" {
   value       = [for profile in aws_sagemaker_user_profile.data_scientists : profile.user_profile_name]
 }
 
-output "notebook_instance_names" {
+output "studio_space_names" {
   description = "Created SageMaker Studio JupyterLab space names"
   value       = [for space in aws_sagemaker_space.jupyterlab : space.space_name]
 }

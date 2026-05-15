@@ -76,6 +76,26 @@ variable "glue_worker_type" {
   default     = "G.1X"
 }
 
+variable "microsite_jdbc_url" {
+  description = "JDBC URL for the BPI MS Microsite MySQL source database"
+  type        = string
+
+  validation {
+    condition     = startswith(var.microsite_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.microsite_jdbc_url)))
+    error_message = "microsite_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+  }
+}
+
+variable "legacy_jdbc_url" {
+  description = "JDBC URL for the BPI MS Legacy MySQL source database"
+  type        = string
+
+  validation {
+    condition     = startswith(var.legacy_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.legacy_jdbc_url)))
+    error_message = "legacy_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+  }
+}
+
 variable "git_repository_url" {
   description = "HTTPS URL of the GitHub repository for SageMaker code repository"
   type        = string

@@ -6,6 +6,7 @@
 # Terraform plan files
 *.tfplan
 *.plan
+tfplan
 
 # Terraform directory
 .terraform/

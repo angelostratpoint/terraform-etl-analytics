@@ -16,16 +16,6 @@ resource "terraform_data" "manual_baseline_contract" {
 
   lifecycle {
     precondition {
-      condition     = var.existing_glue_execution_role_arn != ""
-      error_message = "existing_glue_execution_role_arn is required. IAM/RBAC is manually provisioned by BPI MS/Stratpoint before Terraform runs."
-    }
-
-    precondition {
-      condition     = var.existing_sagemaker_execution_role_arn != ""
-      error_message = "existing_sagemaker_execution_role_arn is required. IAM/RBAC is manually provisioned by BPI MS/Stratpoint before Terraform runs."
-    }
-
-    precondition {
       condition     = var.existing_security_group_id != ""
       error_message = "existing_security_group_id is required. Network and security groups are manually provisioned by BPI MS."
     }
@@ -100,8 +90,8 @@ module "sagemaker" {
   execution_role_arn             = module.iam.sagemaker_execution_role_arn
   studio_user_profile_names      = var.sagemaker_studio_user_profile_names
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
-  notebook_instance_count        = var.sagemaker_notebook_instance_count
-  notebook_instance_type         = var.sagemaker_notebook_instance_type
+  studio_space_instance_type     = var.sagemaker_studio_space_instance_type
+  studio_space_volume_size_gb    = var.sagemaker_studio_space_volume_size_gb
   tags                           = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]

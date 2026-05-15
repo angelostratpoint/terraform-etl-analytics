@@ -12,7 +12,7 @@ resource "aws_athena_workgroup" "cdcu" {
 
       encryption_configuration {
         encryption_option = var.enable_kms ? "SSE_KMS" : "SSE_S3"
-        kms_key           = var.enable_kms ? var.kms_key_arn : null
+        kms_key_arn       = var.enable_kms ? var.kms_key_arn : null
       }
     }
 

@@ -16,16 +16,6 @@ resource "terraform_data" "manual_baseline_contract" {
 
   lifecycle {
     precondition {
-      condition     = var.existing_glue_execution_role_arn != ""
-      error_message = "existing_glue_execution_role_arn is required. IAM/RBAC is manually provisioned by BPI MS/Stratpoint before Terraform runs."
-    }
-
-    precondition {
-      condition     = var.existing_sagemaker_execution_role_arn != ""
-      error_message = "existing_sagemaker_execution_role_arn is required. IAM/RBAC is manually provisioned by BPI MS/Stratpoint before Terraform runs."
-    }
-
-    precondition {
       condition     = var.existing_security_group_id != ""
       error_message = "existing_security_group_id is required. Network and security groups are manually provisioned by BPI MS."
     }

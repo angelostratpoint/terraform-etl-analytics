@@ -64,33 +64,16 @@ variable "studio_app_network_access_type" {
   }
 }
 
-variable "notebook_instance_count" {
-  description = "Number of classic on-demand SageMaker notebook instances to provision"
-  type        = number
-  default     = 0
-}
-
-variable "notebook_instance_type" {
-  description = "Instance type for classic SageMaker notebook instances"
+variable "studio_space_instance_type" {
+  description = "Instance type for the JupyterLab space in Unified Studio"
   type        = string
-  default     = "ml.c4.2xlarge"
+  default     = "ml.t3.medium"
 }
 
-variable "notebook_volume_size_gb" {
-  description = "EBS volume size in GB for each classic notebook instance"
+variable "studio_space_volume_size_gb" {
+  description = "EBS volume size in GB for the JupyterLab space"
   type        = number
-  default     = 20
-}
-
-variable "notebook_direct_internet_access" {
-  description = "Direct internet access setting for classic SageMaker notebook instances"
-  type        = string
-  default     = "Disabled"
-
-  validation {
-    condition     = contains(["Enabled", "Disabled"], var.notebook_direct_internet_access)
-    error_message = "notebook_direct_internet_access must be Enabled or Disabled."
-  }
+  default     = 5
 }
 
 variable "tags" {

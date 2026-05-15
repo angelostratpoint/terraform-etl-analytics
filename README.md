@@ -8,7 +8,7 @@ This repository provisions the Terraform-owned service layer for the CDCU data p
 MySQL RDS sources -> AWS Glue -> S3 -> SageMaker -> Athena -> QuickSight
 ```
 
-BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes IAM/RBAC, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and deployment credentials. Terraform consumes those existing IDs and ARNs as inputs, then provisions only the CDCU application services listed in the project activity scope.
+BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and approved Secrets Manager secret containers. Terraform consumes those existing IDs and ARNs as inputs, then provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
 
 ## Terraform Scope
 
@@ -16,6 +16,7 @@ Terraform owns:
 
 | Activity | Terraform coverage |
 |---|---|
+| Additional IAM/RBAC | `ST-CDCU` service roles, human groups, additive policies, and shared deny policies |
 | 3.3.1 AWS S3 Bucket Creation | Data lake and Athena results buckets |
 | 3.3.2 AWS Glue Provisioning and Folder Structuring | Glue catalog database, connections, jobs, S3 script paths |
 | 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, optional notebooks, code repository |
@@ -26,7 +27,7 @@ Terraform owns:
 Terraform does not own:
 
 - AWS account/IAM/security baseline
-- IAM roles, RBAC policies, or GitHub OIDC role creation
+- Existing BPI MS IAM roles, baseline RBAC policies, or GitHub OIDC deployment role creation
 - VPCs, subnets, route tables, or security group creation
 - KMS key creation or key policy ownership
 - RDS/source database provisioning
@@ -56,13 +57,14 @@ terraform-etl-analytics/
 |   |-- athena/
 |   |-- cloudwatch/             # Reference only; not active in env roots
 |   |-- glue/
+|   |-- iam/                    # Additional ST-CDCU IAM roles, groups, and policies
 |   |-- quicksight/
 |   |-- s3/
 |   `-- sagemaker/
 `-- docs/
 ```
 
-Some legacy/reference modules remain in `modules/` for IAM, KMS, security groups, Secrets Manager, and CloudWatch, but the active `pre-prod` and `prod` environment roots do not instantiate them. Those areas are manually governed or outside the agreed Terraform scripting list for this project.
+Some legacy/reference modules remain in `modules/` for KMS, security groups, Secrets Manager, and CloudWatch, but the active `pre-prod` and `prod` environment roots do not instantiate them. Those areas are manually governed or outside the agreed Terraform scripting list for this project.
 
 ## Required External Inputs
 
@@ -74,12 +76,12 @@ vpc_id
 subnet_id
 subnet_ids
 availability_zone
-existing_glue_execution_role_arn
-existing_sagemaker_execution_role_arn
-existing_quicksight_access_role_arn
 existing_security_group_id
 existing_kms_key_arn # required when enable_kms = true
+existing_quicksight_access_role_arn # optional, for BPI-managed QuickSight role references
 ```
+
+`existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are deprecated compatibility inputs. Active environment roots use the `ST-CDCU` roles created by `modules/iam`.
 
 Glue connections expect these Secrets Manager secret names to already exist:
 

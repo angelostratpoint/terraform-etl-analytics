@@ -144,15 +144,15 @@ variable "terraform_lock_table_name" {
 
 variable "manage_iam" {
   description = <<-EOT
-    Deprecated compatibility flag. Environment roots no longer create IAM roles
-    because IAM/RBAC is manually provisioned outside Terraform for this project.
+    Deprecated compatibility flag retained for tfvars compatibility.
+    ST-CDCU IAM roles and groups are created by the modules/iam module.
   EOT
   type        = bool
   default     = false
 }
 
 variable "existing_glue_execution_role_arn" {
-  description = "ARN of the client-managed Glue execution role"
+  description = "Deprecated compatibility input. Glue now uses module.iam.glue_execution_role_arn."
   type        = string
   default     = ""
 
@@ -163,7 +163,7 @@ variable "existing_glue_execution_role_arn" {
 }
 
 variable "existing_sagemaker_execution_role_arn" {
-  description = "ARN of the client-managed SageMaker execution role"
+  description = "Deprecated compatibility input. SageMaker now uses module.iam.sagemaker_execution_role_arn."
   type        = string
   default     = ""
 

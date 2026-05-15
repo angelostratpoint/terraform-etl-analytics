@@ -73,9 +73,13 @@ jobs, training jobs, and pipelines.
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
 | `SageMakerAccess` | SageMaker | CreateProcessingJob, DescribeProcessingJob, StopProcessingJob, ListProcessingJobs, CreateTrainingJob, DescribeTrainingJob, StopTrainingJob, ListTrainingJobs, CreateModel, DescribeModel, CreateEndpointConfig, DescribeEndpointConfig, CreateEndpoint, DescribeEndpoint, InvokeEndpoint, CreatePipeline, StartPipelineExecution, DescribePipeline, DescribePipelineExecution | `*` |
-| `SageMakerPassRole` | IAM | PassRole | `ST-CDCU-SageMakerExecutionRole` ARN only, condition: `iam:PassedToService = sagemaker.amazonaws.com` |
 | `S3DataLakeAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-data-lake` bucket |
 | `CloudWatchLogsSageMaker` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/sagemaker/*` log groups |
+
+`iam:PassRole` is intentionally excluded from the latest approved ST-CDCU policy list.
+If SageMaker job submission later requires a scoped PassRole exception, BPI MS must
+approve that exception separately because the current account baseline explicitly denies
+PassRole.
 
 ---
 
@@ -105,8 +109,11 @@ management.
 | All policies from ST-CDCU-SageMakerExecutionRole | — | — | — |
 | All policies from ST-CDCU-AthenaQueryRole | — | — | — |
 | `DynamoDBStateLockAccess` | DynamoDB | DescribeTable, GetItem, PutItem, DeleteItem, UpdateItem | Terraform lock table ARN |
-| `EventBridgeAccess` | EventBridge | PutRule, PutTargets, DescribeRule, EnableRule, DisableRule, DeleteRule, RemoveTargets, ListRules, ListTargetsByRule | `arn:aws:events:ap-southeast-1:{account}:rule/*` |
-| `AmazonQDeveloperAccess` | Amazon Q | SendMessage, StartConversation, GetConversation, ListConversations, DeleteConversation | `*` |
+| `EventBridgeAccess` | EventBridge | PutRule, PutTargets, DescribeRule, EnableRule, DisableRule, DeleteRule, RemoveTargets, ListRules, ListTargetsByRule | `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
+| `AmazonQConsoleAssistantOnly` | Amazon Q | SendMessage, StartConversation, GetConversation, ListConversations, DeleteConversation | `*` |
+| `AllowSTSContextForQ` | STS | SetContext | `arn:aws:sts::*:self` |
+| `ExplicitlyDenyQAdministrativeFunctions` | Amazon Q | CreateAssignment, DeleteAssignment, CreatePlugin, UpdatePlugin, DeletePlugin, GetPlugin, UsePlugin, ListPlugins, ListPluginProviders, TagResource, UntagResource, ListTagsForResource | `*` |
+| `ExplicitlyDenyCodeGenerationFeatures` | Amazon Q | GenerateCodeFromCommands | `*` |
 
 > Note: `q:PassRequest` is **not a valid IAM action** and is excluded.
 

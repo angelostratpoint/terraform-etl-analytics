@@ -93,16 +93,16 @@ variable "sagemaker_studio_user_profile_names" {
   default     = ["data-scientist-01"]
 }
 
-variable "sagemaker_notebook_instance_count" {
-  description = "Number of classic on-demand SageMaker notebook instances"
-  type        = number
-  default     = 0
+variable "sagemaker_studio_space_instance_type" {
+  description = "Instance type for the JupyterLab space in Unified Studio"
+  type        = string
+  default     = "ml.t3.medium"
 }
 
-variable "sagemaker_notebook_instance_type" {
-  description = "Classic SageMaker notebook instance type"
-  type        = string
-  default     = "ml.c4.2xlarge"
+variable "sagemaker_studio_space_volume_size_gb" {
+  description = "EBS volume size in GB for the JupyterLab space"
+  type        = number
+  default     = 5
 }
 
 variable "sagemaker_studio_app_network_access_type" {
@@ -144,15 +144,15 @@ variable "terraform_lock_table_name" {
 
 variable "manage_iam" {
   description = <<-EOT
-    Deprecated compatibility flag. Environment roots no longer create IAM roles
-    because IAM/RBAC is manually provisioned outside Terraform for this project.
+    Deprecated compatibility flag retained for tfvars compatibility.
+    ST-CDCU IAM roles and groups are created by the modules/iam module.
   EOT
   type        = bool
   default     = false
 }
 
 variable "existing_glue_execution_role_arn" {
-  description = "ARN of the client-managed Glue execution role"
+  description = "Deprecated compatibility input. Glue now uses module.iam.glue_execution_role_arn."
   type        = string
   default     = ""
 
@@ -163,7 +163,7 @@ variable "existing_glue_execution_role_arn" {
 }
 
 variable "existing_sagemaker_execution_role_arn" {
-  description = "ARN of the client-managed SageMaker execution role"
+  description = "Deprecated compatibility input. SageMaker now uses module.iam.sagemaker_execution_role_arn."
   type        = string
   default     = ""
 

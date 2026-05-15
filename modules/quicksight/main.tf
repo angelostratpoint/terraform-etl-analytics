@@ -2,7 +2,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  module_admin_group_arn     = "arn:aws:quicksight:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:group/${var.namespace}/cdcu-${var.environment}-admins"
+  module_admin_group_arn    = "arn:aws:quicksight:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:group/${var.namespace}/cdcu-${var.environment}-admins"
   effective_admin_principal = var.admin_principal_arn != "" ? var.admin_principal_arn : local.module_admin_group_arn
 
   data_source_owner_permissions = var.enabled ? [
@@ -79,14 +79,6 @@ resource "aws_quicksight_data_source" "athena" {
     disable_ssl = false
   }
 
-  dynamic "permission" {
-    for_each = local.data_source_owner_permissions
-    content {
-      principal = permission.value.principal
-      actions   = permission.value.actions
-    }
-  }
-
   tags = merge(var.tags, {
     Name            = "cdcu-${var.environment}-athena-datasource"
     SpiceCapacityGB = tostring(var.spice_capacity_gb)
@@ -130,14 +122,6 @@ resource "aws_quicksight_data_set" "matching_results" {
         name = "matched_record_id"
         type = "STRING"
       }
-    }
-  }
-
-  dynamic "permission" {
-    for_each = local.dataset_owner_permissions
-    content {
-      principal = permission.value.principal
-      actions   = permission.value.actions
     }
   }
 

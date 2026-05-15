@@ -22,11 +22,9 @@ sso_principal_arns = [
   "arn:aws:iam::123456789012:role/AWSReservedSSO_DataEngineer_xxxxxxxxxxxxxxxx"
 ]
 
-# KMS is enabled in prod and must use a BPI MS managed key.
 enable_kms    = true
 sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:cdcu-prod-alerts"
 
-# Higher worker counts for 1M record processing.
 glue_worker_count = 10
 glue_worker_type  = "G.1X"
 
@@ -41,14 +39,12 @@ sagemaker_notebook_instance_count        = 4
 sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
-# IAM/RBAC is managed by the modules/iam module using ST-CDCU prefix.
-# Keep manage_iam false — roles and groups are created by Terraform IAM module.
+# IAM/RBAC is managed by the modules/iam module using the ST-CDCU prefix.
+# manage_iam is a deprecated compatibility flag and has no effect.
 manage_iam                = false
 terraform_lock_table_name = "cdcu-terraform-state-lock"
 
 # Client-managed baseline inputs from BPI MS / manual setup.
-# existing_glue_execution_role_arn and existing_sagemaker_execution_role_arn
-# are now created by modules/iam — remove them from tfvars.
-existing_quicksight_access_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-quicksight-access-role"
+existing_quicksight_access_role_arn = ""
 existing_kms_key_arn                = "arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000"
 existing_security_group_id          = "sg-0123456789abcdef0"

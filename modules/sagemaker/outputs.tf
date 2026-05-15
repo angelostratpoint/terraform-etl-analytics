@@ -24,6 +24,6 @@ output "studio_user_profiles" {
 }
 
 output "notebook_instance_names" {
-  description = "Created SageMaker notebook instance names"
-  value       = [for notebook in aws_sagemaker_notebook_instance.on_demand : notebook.name]
+  description = "Created SageMaker Studio JupyterLab space names"
+  value       = [for space in aws_sagemaker_space.jupyterlab : space.space_name]
 }

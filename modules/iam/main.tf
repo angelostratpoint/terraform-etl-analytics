@@ -108,24 +108,42 @@ resource "aws_iam_policy" "glue_etl" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "GlueCrawlerAndETL"
-      Effect = "Allow"
-      Action = [
-        "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
-        "glue:GetTable", "glue:GetTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
-        "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
-        "glue:CreateCrawler", "glue:UpdateCrawler", "glue:DeleteCrawler",
-        "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler",
-        "glue:CreateJob", "glue:UpdateJob", "glue:DeleteJob",
-        "glue:GetJob", "glue:GetJobs", "glue:StartJobRun",
-        "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun",
-        "glue:GetConnection", "glue:CreateConnection", "glue:UpdateConnection",
-        "glue:DeleteConnection", "glue:GetConnections",
-        "glue:GetSecurityConfiguration"
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid    = "GlueCrawlerAndETL"
+        Effect = "Allow"
+        Action = [
+          "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
+          "glue:GetTable", "glue:GetTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
+          "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
+          "glue:CreateCrawler", "glue:UpdateCrawler", "glue:DeleteCrawler",
+          "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler",
+          "glue:CreateJob", "glue:UpdateJob", "glue:DeleteJob",
+          "glue:GetJob", "glue:GetJobs", "glue:StartJobRun",
+          "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun",
+          "glue:GetConnection", "glue:CreateConnection", "glue:UpdateConnection",
+          "glue:DeleteConnection", "glue:GetConnections",
+          "glue:GetSecurityConfiguration",
+          "glue:BatchGetPartition", "glue:BatchCreatePartition", "glue:BatchDeletePartition"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "GlueVPCPlacement"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeRouteTables",
+          "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:DescribeNetworkInterfaces"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -166,7 +184,10 @@ resource "aws_iam_policy" "glue_cloudwatch" {
         "logs:DescribeLogStreams",
         "logs:GetLogEvents"
       ]
-      Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*"
+      Resource = [
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*"
+      ]
     }]
   })
 
@@ -236,7 +257,14 @@ resource "aws_iam_policy" "sagemaker_access" {
           "sagemaker:CreateEndpointConfig", "sagemaker:DescribeEndpointConfig",
           "sagemaker:CreateEndpoint", "sagemaker:DescribeEndpoint", "sagemaker:InvokeEndpoint",
           "sagemaker:CreatePipeline", "sagemaker:StartPipelineExecution",
-          "sagemaker:DescribePipeline", "sagemaker:DescribePipelineExecution"
+          "sagemaker:DescribePipeline", "sagemaker:DescribePipelineExecution",
+          "sagemaker:ListSpaces", "sagemaker:DescribeSpace",
+          "sagemaker:ListApps", "sagemaker:DescribeApp",
+          "sagemaker:CreateApp", "sagemaker:DeleteApp",
+          "sagemaker:ListDomains", "sagemaker:DescribeDomain",
+          "sagemaker:ListUserProfiles", "sagemaker:DescribeUserProfile",
+          "sagemaker:CreatePresignedDomainUrl",
+          "sagemaker:AddTags", "sagemaker:ListTags", "sagemaker:DeleteTags"
         ]
         Resource = "*"
       },
@@ -498,9 +526,49 @@ resource "aws_iam_group_policy_attachment" "ce_glue_secrets" {
   policy_arn = aws_iam_policy.glue_secrets.arn
 }
 
-resource "aws_iam_group_policy_attachment" "ce_glue_cloudwatch" {
+# Combined CloudWatch policy for the group — keeps CE under the 10-policy group limit. — keeps CE under the 10-policy group limit.
+# Execution roles (Glue, SageMaker) keep their individual cloudwatch policies.
+resource "aws_iam_policy" "ce_cloudwatch_combined" {
+  name = "ST-CDCU-${local.env}-CECloudWatchLogsAccess"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "CloudWatchLogsAllCDCU"
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents"
+      ]
+      Resource = [
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*"
+      ]
+    }]
+  })
+
+  tags = var.tags
+}
+
+# CloudEngineering group — exactly 10 attachments (AWS hard limit)
+# 1. GlueS3Access
+# 2. GlueCrawlerAndETL
+# 3. GlueSecretsRead
+# 4. CECloudWatchLogsAccess (combined Glue + SageMaker)
+# 5. SageMakerAccess
+# 6. SageMakerS3Access
+# 7. AthenaAccess
+# 8. DynamoDBStateLock
+# 9. EventBridgeAccess
+# 10. DenySensitiveServices
+# NOTE: AmazonQDeveloperAccess is NOT attached to the group — grant individually per user if needed.
+resource "aws_iam_group_policy_attachment" "ce_cloudwatch_combined" {
   group      = aws_iam_group.cloud_engineering.name
-  policy_arn = aws_iam_policy.glue_cloudwatch.arn
+  policy_arn = aws_iam_policy.ce_cloudwatch_combined.arn
 }
 
 resource "aws_iam_group_policy_attachment" "ce_sagemaker" {
@@ -511,11 +579,6 @@ resource "aws_iam_group_policy_attachment" "ce_sagemaker" {
 resource "aws_iam_group_policy_attachment" "ce_sagemaker_s3" {
   group      = aws_iam_group.cloud_engineering.name
   policy_arn = aws_iam_policy.sagemaker_s3.arn
-}
-
-resource "aws_iam_group_policy_attachment" "ce_sagemaker_cloudwatch" {
-  group      = aws_iam_group.cloud_engineering.name
-  policy_arn = aws_iam_policy.sagemaker_cloudwatch.arn
 }
 
 resource "aws_iam_group_policy_attachment" "ce_athena" {
@@ -531,11 +594,6 @@ resource "aws_iam_group_policy_attachment" "ce_dynamodb" {
 resource "aws_iam_group_policy_attachment" "ce_eventbridge" {
   group      = aws_iam_group.cloud_engineering.name
   policy_arn = aws_iam_policy.ce_eventbridge.arn
-}
-
-resource "aws_iam_group_policy_attachment" "ce_amazon_q" {
-  group      = aws_iam_group.cloud_engineering.name
-  policy_arn = aws_iam_policy.ce_amazon_q.arn
 }
 
 resource "aws_iam_group_policy_attachment" "ce_deny" {

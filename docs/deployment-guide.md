@@ -1,6 +1,6 @@
 # CDCU Terraform Deployment Guide
 
-This workspace provisions only the CDCU application service layer. BPI MS / Stratpoint manually prepares IAM/RBAC, security baseline, VPC/subnets, security groups, KMS, source database access, and deployment credentials before Terraform runs.
+This workspace provisions the CDCU application service layer plus the additional `ST-CDCU` IAM roles and groups requested for the project. BPI MS / Stratpoint manually prepares the account baseline, deployment role, security baseline, VPC/subnets, security groups, KMS, source database access, and approved Secrets Manager secret containers before Terraform runs.
 
 ## Prerequisites
 
@@ -11,9 +11,9 @@ Before deploying, confirm the following are in place:
 - [ ] AWS SSO profile configured for the target environment
 - [ ] Remote state bucket and lock table bootstrapped, if not already created
 - [ ] BPI MS provided VPC ID, subnet ID, security group ID, and availability zone
-- [ ] BPI MS / Stratpoint provided Glue and SageMaker execution role ARNs
 - [ ] Existing KMS key ARN provided when `enable_kms = true`
 - [ ] Required Secrets Manager secrets already created
+- [ ] BPI MS has approved the additional `ST-CDCU` IAM roles, groups, and policies
 - [ ] GitHub environment named `prod` created with at least one required reviewer
 
 ## Manual Baseline Inputs
@@ -27,14 +27,13 @@ Fill these in `terraform.tfvars` for each environment:
 | `subnet_id` / `subnet_ids` | BPI MS network baseline |
 | `availability_zone` | Must match the Glue subnet |
 | `existing_security_group_id` | BPI MS network/security baseline |
-| `existing_glue_execution_role_arn` | Manual IAM/RBAC setup |
-| `existing_sagemaker_execution_role_arn` | Manual IAM/RBAC setup |
-| `existing_quicksight_access_role_arn` | Manual IAM/RBAC setup, if required |
+| `terraform_lock_table_name` | DynamoDB lock table used by Terraform state locking |
+| `existing_quicksight_access_role_arn` | Optional BPI-managed QuickSight role reference, if required |
 | `existing_kms_key_arn` | Manual KMS baseline, required when KMS is enabled |
 | `git_repository_url` | GitHub repository URL for SageMaker code repository |
 | `quicksight_admin_principal_arn` | Existing QuickSight user/group owner, if not using Terraform-created group |
 
-Terraform checks the required external IDs and ARNs before provisioning CDCU services.
+Terraform checks the required external IDs before provisioning CDCU services. Glue and SageMaker execution roles are created by the `modules/iam` module using the `ST-CDCU` prefix.
 
 ## Required Secrets
 

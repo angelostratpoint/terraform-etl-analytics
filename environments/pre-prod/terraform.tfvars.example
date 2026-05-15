@@ -35,18 +35,16 @@ enable_sagemaker_unified_studio = true
 sagemaker_studio_user_profile_names = [
   "data-scientist-01",
 ]
-sagemaker_notebook_instance_count        = 0
-sagemaker_notebook_instance_type         = "ml.c4.2xlarge"
+sagemaker_notebook_instance_count        = 1
+sagemaker_notebook_instance_type         = "ml.t3.medium"
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
-# IAM/RBAC is managed by the modules/iam module using ST-CDCU prefix.
-# Keep manage_iam false — roles and groups are created by Terraform IAM module.
+# IAM/RBAC is managed by the modules/iam module using the ST-CDCU prefix.
+# manage_iam is a deprecated compatibility flag and has no effect.
 manage_iam                = false
 terraform_lock_table_name = "cdcu-terraform-state-lock"
 
 # Client-managed baseline inputs from BPI MS / manual setup.
-# existing_glue_execution_role_arn and existing_sagemaker_execution_role_arn
-# are now created by modules/iam — remove them from tfvars.
-existing_quicksight_access_role_arn = "arn:aws:iam::123456789012:role/cdcu-pre-prod-quicksight-access-role"
+existing_quicksight_access_role_arn = ""
 existing_kms_key_arn                = ""
 existing_security_group_id          = "sg-0123456789abcdef0"

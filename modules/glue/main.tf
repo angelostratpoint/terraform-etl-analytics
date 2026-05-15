@@ -8,7 +8,7 @@ data "aws_secretsmanager_secret" "legacy_mysql_connection" {
 }
 
 resource "aws_glue_catalog_database" "cdcu" {
-  name        = "cdcu_${var.environment}_catalog"
+  name        = "cdcu_${replace(var.environment, "-", "_")}_catalog"
   description = "CDCU ${var.environment} Glue Data Catalog database"
 }
 
@@ -18,7 +18,8 @@ resource "aws_glue_connection" "microsite_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    SECRET_ID = "cdcu/${var.environment}/microsite-mysql-connection"
+    JDBC_CONNECTION_URL = "jdbc:mysql://localhost:3306/test"
+    SECRET_ID           = "cdcu/${var.environment}/microsite-mysql-connection"
   }
 
   physical_connection_requirements {
@@ -38,7 +39,8 @@ resource "aws_glue_connection" "legacy_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    SECRET_ID = "cdcu/${var.environment}/legacy-mysql-connection"
+    JDBC_CONNECTION_URL = "jdbc:mysql://localhost:3306/test"
+    SECRET_ID           = "cdcu/${var.environment}/legacy-mysql-connection"
   }
 
   physical_connection_requirements {
@@ -59,7 +61,7 @@ resource "aws_glue_job" "microsite_raw_extraction" {
   glue_version = "4.0"
 
   command {
-    name            = "glueetl"
+    name = "glueetl"
     # Script path uses environment prefix — uploaded by the artifacts module
     script_location = "s3://${var.scripts_bucket}/${var.environment}/glue-scripts/extraction/microsite_raw_extraction.py"
     python_version  = "3"

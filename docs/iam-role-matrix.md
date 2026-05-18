@@ -8,14 +8,14 @@ BPI MS existing `cdcu-*` roles remain outside Terraform scope and are not modifi
 | Role Name | Trust Principal | Purpose |
 |---|---|---|
 | `ST-CDCU-{env}-GlueExecutionRole` | `glue.amazonaws.com` | Runs Glue jobs and crawlers |
-| `ST-CDCU-{env}-SageMakerExecutionRole` | `sagemaker.amazonaws.com` | Runs SageMaker Studio, notebooks, processing jobs, training jobs, and pipelines |
+| `ST-CDCU-{env}-SageMakerExecutionRole` | `sagemaker.amazonaws.com` | Runs SageMaker Studio, JupyterLab spaces, processing jobs, training jobs, and pipelines |
 | `ST-CDCU-{env}-AthenaQueryRole` | `quicksight.amazonaws.com` | Allows QuickSight to query Athena and browse Glue Data Catalog metadata |
 
 ## Human Groups
 
 | IAM Group | Intended Users | Access Level |
 |---|---|---|
-| `ST-CDCU-{env}-CloudEngineering` | BPI MS / approved Cloud Engineers | Application service deployment permissions, Terraform state locking, EventBridge, and Amazon Q console assistant access |
+| `ST-CDCU-{env}-CloudEngineering` | BPI MS / approved Cloud Engineers | Application service deployment permissions, Terraform state locking, and EventBridge rule management. Amazon Q is granted individually if approved. |
 | `ST-CDCU-{env}-DataEngineering` | Data Engineers | S3 data lake, Glue, SageMaker, Athena, read-only Secrets Manager, and CloudWatch Logs |
 | `ST-CDCU-{env}-QA` | QA testers | Read-only validation through Athena results and CloudWatch Logs |
 
@@ -31,8 +31,8 @@ BPI MS existing `cdcu-*` roles remain outside Terraform scope and are not modifi
 | Secrets Manager | Read-only access to `cdcu/{env}/*` secrets; no create/update/delete/put secret value |
 | CloudWatch Logs | Glue and SageMaker log creation/write/read actions as appropriate per role/group |
 | EventBridge | Rule management scoped to `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
-| DynamoDB | Terraform state lock access to `cdcu-terraform-state-lock` or the configured lock table |
-| Amazon Q | Console assistant conversation actions only, with explicit denies for plugin/admin/code-generation actions |
+| DynamoDB | Terraform state lock access to the configured environment backend table, such as `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod` |
+| Amazon Q | Console assistant conversation actions only, with `sts:SetContext` and explicit denies for plugin/admin/code-generation actions. Policy exists but is not attached to groups. |
 
 ## Shared Deny Boundary
 

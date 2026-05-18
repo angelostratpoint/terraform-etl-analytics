@@ -45,7 +45,7 @@ sagemaker_studio_app_network_access_type = "VpcOnly"
 # IAM/RBAC is managed by the modules/iam module using the ST-CDCU prefix.
 # manage_iam is a deprecated compatibility flag and has no effect.
 manage_iam                = false
-terraform_lock_table_name = "cdcu-terraform-state-lock"
+terraform_lock_table_name = "cdcu-terraform-locks-pre-prod"
 
 # Client-managed baseline inputs from BPI MS / manual setup.
 existing_quicksight_access_role_arn = ""

@@ -63,7 +63,7 @@ Please fill these values in each environment's `terraform.tfvars` before running
 | `existing_security_group_id` | BPI MS security baseline | Always |
 | `existing_kms_key_arn` | BPI MS KMS baseline | Prod only when `enable_kms = true` |
 | `existing_quicksight_access_role_arn` | BPI MS QuickSight setup | Optional reference |
-| `terraform_lock_table_name` | DynamoDB lock table name | Default: `cdcu-terraform-state-lock` |
+| `terraform_lock_table_name` | DynamoDB lock table name | Must match backend table: `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod` |
 
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are
 deprecated compatibility inputs. The active environment roots use the ST-CDCU roles

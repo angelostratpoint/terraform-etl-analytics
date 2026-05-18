@@ -57,7 +57,8 @@ Assumed by `glue.amazonaws.com`. Used by all Glue ETL jobs and crawlers.
 | `S3DataLakeAccess` | S3 | GetObject, PutObject, DeleteObject, ListBucket, GetBucketVersioning, PutBucketVersioning | `cdcu-{env}-data-lake` bucket |
 | `GlueCrawlerAndETL` | Glue | Full crawler, job, catalog, connection actions (see note below) | `*` |
 | `SecretsManagerRead` | Secrets Manager | GetSecretValue, DescribeSecret | `cdcu/{env}/*` secrets |
-| `CloudWatchLogsGlue` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/glue/*` log groups |
+| `CloudWatchLogsGlueWriteRead` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, GetLogEvents | `/aws/glue/*`, `/aws-glue/*`, and log-stream ARNs |
+| `CloudWatchLogsGlueDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
 
 > Note on Glue actions: `glue:GetCatalog`, `glue:CreateCatalog`, `glue:DeleteCatalog`,
 > and `glue:UpdateCatalog` are **not valid IAM actions** and are excluded from the
@@ -67,14 +68,15 @@ Assumed by `glue.amazonaws.com`. Used by all Glue ETL jobs and crawlers.
 
 ### ST-CDCU-SageMakerExecutionRole
 
-Assumed by `sagemaker.amazonaws.com`. Used by SageMaker Studio, notebooks, processing
+Assumed by `sagemaker.amazonaws.com`. Used by SageMaker Studio, JupyterLab spaces, processing
 jobs, training jobs, and pipelines.
 
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
-| `SageMakerAccess` | SageMaker | CreateProcessingJob, DescribeProcessingJob, StopProcessingJob, ListProcessingJobs, CreateTrainingJob, DescribeTrainingJob, StopTrainingJob, ListTrainingJobs, CreateModel, DescribeModel, CreateEndpointConfig, DescribeEndpointConfig, CreateEndpoint, DescribeEndpoint, InvokeEndpoint, CreatePipeline, StartPipelineExecution, DescribePipeline, DescribePipelineExecution | `*` |
+| `SageMakerAccess` | SageMaker | Processing, training, model, endpoint, pipeline, Studio domain/user profile, JupyterLab space/app, presigned domain URL, and tag actions | `*` |
 | `S3DataLakeAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-data-lake` bucket |
-| `CloudWatchLogsSageMaker` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/sagemaker/*` log groups |
+| `CloudWatchLogsSageMakerWriteRead` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, GetLogEvents | `/aws/sagemaker/*` and log-stream ARNs |
+| `CloudWatchLogsSageMakerDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
 
 `iam:PassRole` is intentionally excluded from the latest approved ST-CDCU policy list.
 If SageMaker job submission later requires a scoped PassRole exception, BPI MS must
@@ -110,6 +112,7 @@ management.
 | All policies from ST-CDCU-AthenaQueryRole | — | — | — |
 | `DynamoDBStateLockAccess` | DynamoDB | DescribeTable, GetItem, PutItem, DeleteItem, UpdateItem | Terraform lock table ARN |
 | `EventBridgeAccess` | EventBridge | PutRule, PutTargets, DescribeRule, EnableRule, DisableRule, DeleteRule, RemoveTargets, ListRules, ListTargetsByRule | `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
+| `DenyNonCDCUEventBridgeRuleMutation` | EventBridge | Explicit deny for mutating non-CDCU rules | NotResource `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
 | `AmazonQConsoleAssistantOnly` | Amazon Q | SendMessage, StartConversation, GetConversation, ListConversations, DeleteConversation | `*` |
 | `AllowSTSContextForQ` | STS | SetContext | `arn:aws:sts::*:self` |
 | `ExplicitlyDenyQAdministrativeFunctions` | Amazon Q | CreateAssignment, DeleteAssignment, CreatePlugin, UpdatePlugin, DeletePlugin, GetPlugin, UsePlugin, ListPlugins, ListPluginProviders, TagResource, UntagResource, ListTagsForResource | `*` |
@@ -121,7 +124,7 @@ management.
 
 ### ST-CDCU-DataEngineering
 
-Access for Data Engineers working on ETL scripts, SageMaker notebooks, and Athena queries.
+Access for Data Engineers working on ETL scripts, SageMaker Studio/JupyterLab spaces, and Athena queries.
 
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
@@ -131,7 +134,8 @@ Access for Data Engineers working on ETL scripts, SageMaker notebooks, and Athen
 | `AthenaAccess` | Athena | Same as ST-CDCU-AthenaQueryRole | `cdcu-{env}-workgroup` ARN |
 | `AthenaResultsAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-athena-results` bucket |
 | `SecretsManagerReadAccess` | Secrets Manager | GetSecretValue, DescribeSecret, ListSecrets, ListSecretVersionIds, GetResourcePolicy, BatchGetSecretValue | `cdcu/{env}/*` secrets |
-| `CloudWatchLogsRead` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/glue/*` and `/aws/sagemaker/*` |
+| `CloudWatchLogsRead` | CloudWatch Logs | GetLogEvents | `/aws/glue/*`, `/aws-glue/*`, `/aws/sagemaker/*`, and log-stream ARNs |
+| `CloudWatchLogsDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
 
 ---
 
@@ -143,7 +147,8 @@ Read-only access for QA testers to validate pipeline outputs via Athena and Clou
 |---|---|---|---|
 | `S3AthenaResultsRead` | S3 | GetObject, ListBucket | `cdcu-{env}-athena-results` bucket only |
 | `AthenaReadOnly` | Athena | GetQueryExecution, GetQueryResults, ListQueryExecutions, GetWorkGroup | `cdcu-{env}-workgroup` ARN |
-| `CloudWatchLogsRead` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams, GetLogEvents | `/aws/glue/*` log groups |
+| `CloudWatchLogsRead` | CloudWatch Logs | GetLogEvents | `/aws/glue/*`, `/aws-glue/*`, and log-stream ARNs |
+| `CloudWatchLogsDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
 
 ---
 
@@ -161,9 +166,12 @@ boundary that Stratpoint does not own or modify BPI MS's account baseline.
 
 ## VPC Access Clarification
 
-EC2 and VPC are **outside Terraform scope** for this project per the README. Terraform
-consumes `vpc_id`, `subnet_id`, and `existing_security_group_id` as input values only.
-No EC2 resources are created, modified, or referenced in any IAM policy.
+EC2 and VPC are **outside Terraform ownership** for this project per the README.
+Terraform consumes `vpc_id`, `subnet_id`, and `existing_security_group_id` as input
+values only. The only EC2 permissions in the IAM module are Glue VPC placement actions
+required for Glue jobs/crawlers to create and remove runtime network interfaces in the
+approved subnet/security group path. These are runtime support permissions, not EC2
+instance or networking governance permissions.
 
 BPI MS owns and manages all network resources. Stratpoint has confirmed that EC2 actions
 are blocked at the account level for Stratpoint IAM users.
@@ -210,7 +218,7 @@ that were previously filled manually in `terraform.tfvars`.
 Before running `terraform apply` on the IAM module:
 
 - [ ] Confirm `ST-CDCU` prefix is acceptable for resource naming in BPI MS account
-- [ ] Confirm Terraform lock table name (default: `cdcu-terraform-state-lock`)
+- [ ] Confirm Terraform lock table name matches the backend table, such as `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod`
 - [ ] Confirm `q:PassRequest` removal is acknowledged — it is not a valid IAM action
 - [ ] Confirm Secrets Manager write/delete access is **not** granted to Stratpoint roles — BPI MS owns secret values
 - [ ] Provide CE access to Stratpoint once scripts are reviewed and approved

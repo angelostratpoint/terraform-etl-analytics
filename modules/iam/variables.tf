@@ -19,9 +19,8 @@ variable "athena_workgroup_name" {
 }
 
 variable "terraform_lock_table_name" {
-  description = "Name of the DynamoDB table used for Terraform state locking"
+  description = "Name of the DynamoDB table used for Terraform state locking. Environment roots pass the backend lock table name."
   type        = string
-  default     = "cdcu-terraform-state-lock"
 }
 
 variable "tags" {

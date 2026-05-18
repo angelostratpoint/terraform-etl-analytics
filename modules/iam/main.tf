@@ -82,22 +82,28 @@ resource "aws_iam_policy" "glue_s3" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "S3DataLakeAccess"
-      Effect = "Allow"
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:ListBucket",
-        "s3:GetBucketVersioning",
-        "s3:PutBucketVersioning"
-      ]
-      Resource = [
-        var.data_lake_bucket_arn,
-        "${var.data_lake_bucket_arn}/*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "S3DataLakeObjectAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
+        Sid    = "S3DataLakeBucketAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning"
+        ]
+        Resource = var.data_lake_bucket_arn
+      }
+    ]
   })
 
   tags = var.tags
@@ -173,24 +179,33 @@ resource "aws_iam_policy" "glue_cloudwatch" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "CloudWatchLogsGlue"
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:GetLogEvents"
-      ]
-      Resource = [
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsGlueWriteRead"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*"
+        ]
+      },
+      {
+        Sid    = "CloudWatchLogsGlueDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -227,7 +242,7 @@ resource "aws_iam_role_policy_attachment" "glue_deny" {
 
 resource "aws_iam_role" "sagemaker_execution" {
   name        = "ST-CDCU-${local.env}-SageMakerExecutionRole"
-  description = "Execution role for CDCU SageMaker Studio, notebooks, and jobs"
+  description = "Execution role for CDCU SageMaker Studio, JupyterLab spaces, and jobs"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -281,19 +296,23 @@ resource "aws_iam_policy" "sagemaker_s3" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "S3DataLakeAccess"
-      Effect = "Allow"
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:ListBucket"
-      ]
-      Resource = [
-        var.data_lake_bucket_arn,
-        "${var.data_lake_bucket_arn}/*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "SageMakerS3DataLakeObjectAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
+        Sid      = "SageMakerS3DataLakeListAccess"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = var.data_lake_bucket_arn
+      }
+    ]
   })
 
   tags = var.tags
@@ -304,22 +323,31 @@ resource "aws_iam_policy" "sagemaker_cloudwatch" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "CloudWatchLogsSageMaker"
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:GetLogEvents"
-      ]
-      Resource = [
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsSageMakerWriteRead"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
+        ]
+      },
+      {
+        Sid    = "CloudWatchLogsSageMakerDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -390,13 +418,15 @@ resource "aws_iam_policy" "athena_access" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject",
-          "s3:ListBucket"
+          "s3:PutObject"
         ]
-        Resource = [
-          var.athena_results_bucket_arn,
-          "${var.athena_results_bucket_arn}/*"
-        ]
+        Resource = "${var.athena_results_bucket_arn}/*"
+      },
+      {
+        Sid      = "AthenaResultsListAccess"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = var.athena_results_bucket_arn
       },
       {
         Sid    = "AthenaGlueCatalogAccess"
@@ -462,22 +492,37 @@ resource "aws_iam_policy" "ce_eventbridge" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "EventBridgeAccess"
-      Effect = "Allow"
-      Action = [
-        "events:PutRule",
-        "events:PutTargets",
-        "events:DescribeRule",
-        "events:EnableRule",
-        "events:DisableRule",
-        "events:DeleteRule",
-        "events:RemoveTargets",
-        "events:ListRules",
-        "events:ListTargetsByRule"
-      ]
-      Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
-    }]
+    Statement = [
+      {
+        Sid    = "EventBridgeAccess"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:DescribeRule",
+          "events:EnableRule",
+          "events:DisableRule",
+          "events:DeleteRule",
+          "events:RemoveTargets",
+          "events:ListRules",
+          "events:ListTargetsByRule"
+        ]
+        Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
+      },
+      {
+        Sid    = "DenyNonCDCUEventBridgeRuleMutation"
+        Effect = "Deny"
+        Action = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:EnableRule",
+          "events:DisableRule",
+          "events:DeleteRule",
+          "events:RemoveTargets"
+        ]
+        NotResource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -560,26 +605,35 @@ resource "aws_iam_policy" "ce_cloudwatch_combined" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "CloudWatchLogsAllCDCU"
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:GetLogEvents"
-      ]
-      Resource = [
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsAllCDCUWriteRead"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
+        ]
+      },
+      {
+        Sid    = "CloudWatchLogsAllCDCUDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -675,23 +729,30 @@ resource "aws_iam_policy" "de_cloudwatch" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "CloudWatchLogsRead"
-      Effect = "Allow"
-      Action = [
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:GetLogEvents"
-      ]
-      Resource = [
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
-        "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = ["logs:GetLogEvents"]
+        Resource = [
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*:log-stream:*"
+        ]
+      },
+      {
+        Sid    = "CloudWatchLogsDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
   })
 
   tags = var.tags
@@ -752,16 +813,16 @@ resource "aws_iam_policy" "qa_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "S3AthenaResultsRead"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          var.athena_results_bucket_arn,
-          "${var.athena_results_bucket_arn}/*"
-        ]
+        Sid      = "S3AthenaResultsRead"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${var.athena_results_bucket_arn}/*"
+      },
+      {
+        Sid      = "S3AthenaResultsList"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = var.athena_results_bucket_arn
       },
       {
         Sid    = "AthenaReadOnly"
@@ -777,17 +838,22 @@ resource "aws_iam_policy" "qa_access" {
       {
         Sid    = "CloudWatchLogsRead"
         Effect = "Allow"
-        Action = [
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-          "logs:GetLogEvents"
-        ]
+        Action = ["logs:GetLogEvents"]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws-glue/*:log-stream:*"
         ]
+      },
+      {
+        Sid    = "CloudWatchLogsDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
       }
     ]
   })

@@ -43,7 +43,7 @@ variable "security_group_ids" {
 }
 
 variable "execution_role_arn" {
-  description = "SageMaker execution role ARN used by Studio, notebooks, processing, and training jobs"
+  description = "SageMaker execution role ARN used by Studio, JupyterLab spaces, processing, and training jobs"
   type        = string
 }
 

@@ -120,7 +120,7 @@ Add at least one `.py` or `.sql` file to the relevant `artifacts/` subdirectory 
 **Solution:**
 ```bash
 # Request limit increase via AWS Support console
-# Approved instance types: ml.t3.medium (notebooks), ml.c4.2xlarge (processing)
+# Approved instance types: ml.t3.medium (Studio/JupyterLab spaces), ml.c4.2xlarge (processing)
 ```
 
 ---

@@ -157,9 +157,9 @@ variable "quicksight_spice_capacity_gb" {
 ###############################################################################
 
 variable "terraform_lock_table_name" {
-  description = "Name of the DynamoDB table used for Terraform state locking"
+  description = "Name of the DynamoDB table used for Terraform state locking; must match the backend DynamoDB table unless BPI MS approves a separate IAM table."
   type        = string
-  default     = "cdcu-terraform-state-lock"
+  default     = "cdcu-terraform-locks-prod"
 }
 
 variable "manage_iam" {

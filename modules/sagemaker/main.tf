@@ -50,8 +50,8 @@ resource "aws_sagemaker_code_repository" "cdcu_scripts" {
 resource "aws_sagemaker_space" "jupyterlab" {
   for_each = var.enable_unified_studio ? toset(var.studio_user_profile_names) : toset([])
 
-  domain_id         = aws_sagemaker_domain.studio[0].id
-  space_name        = "${each.value}-jupyterlab"
+  domain_id  = aws_sagemaker_domain.studio[0].id
+  space_name = "${each.value}-jupyterlab"
   ownership_settings {
     owner_user_profile_name = each.value
   }

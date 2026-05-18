@@ -19,7 +19,7 @@ Terraform owns:
 | Additional IAM/RBAC | `ST-CDCU` service roles, human groups, additive policies, and shared deny policies |
 | 3.3.1 AWS S3 Bucket Creation | Data lake and Athena results buckets |
 | 3.3.2 AWS Glue Provisioning and Folder Structuring | Glue catalog database, connections, jobs, S3 script paths |
-| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, optional notebooks, code repository |
+| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, JupyterLab spaces, code repository |
 | 3.3.4 Amazon Athena Provisioning | Workgroup and query configuration |
 | 3.3.5 AWS Crawler Provisioning | Glue crawlers for raw, standardized, processed, and error prefixes |
 | 3.3.6 AWS QuickSight Provisioning | QuickSight groups, Athena data source, and dataset when enabled |
@@ -55,7 +55,6 @@ terraform-etl-analytics/
 |-- modules/
 |   |-- artifacts/              # Uploads artifacts/* files to S3
 |   |-- athena/
-|   |-- cloudwatch/             # Reference only; not active in env roots
 |   |-- glue/
 |   |-- iam/                    # Additional ST-CDCU IAM roles, groups, and policies
 |   |-- quicksight/
@@ -64,7 +63,12 @@ terraform-etl-analytics/
 `-- docs/
 ```
 
-Some legacy/reference modules remain in `modules/` for KMS, security groups, Secrets Manager, and CloudWatch, but the active `pre-prod` and `prod` environment roots do not instantiate them. Those areas are manually governed or outside the agreed Terraform scripting list for this project.
+Enterprise KMS, security groups, Secrets Manager secret values, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
+
+## IAM Alignment
+
+The BPI-MS IAM policy alignment reference is maintained in `docs/bpims-iam-policy-alignment.md`.
+It identifies implemented `ST-CDCU` roles/groups, group attachments, service policies, and approval-only items such as scoped PassRole, EventBridge service execution, and KMS runtime permissions.
 
 ## Required External Inputs
 

@@ -43,6 +43,8 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+versions.json
+tmp_delete*.json
 
 # Python artifacts
 __pycache__/

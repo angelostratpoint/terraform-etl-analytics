@@ -10,9 +10,13 @@ Before deploying, confirm the following are in place:
 - [ ] Terraform >= 1.6.0 installed
 - [ ] AWS SSO profile configured for the target environment
 - [ ] Remote state bucket and lock table bootstrapped, if not already created
+- [ ] `terraform_role_arn` is an IAM role ARN that the operator or CI identity can assume, not an IAM user ARN
 - [ ] BPI MS provided VPC ID, subnet ID, security group ID, and availability zone
+- [ ] Glue subnet has S3 access through an S3 Gateway VPC endpoint or NAT route
 - [ ] Existing KMS key ARN provided when `enable_kms = true`
 - [ ] Required Secrets Manager secrets already created
+- [ ] Real RDS JDBC URLs provided for Microsite and Legacy MySQL sources
+- [ ] QuickSight is enabled in `ap-southeast-1` when `enable_quicksight = true`
 - [ ] BPI MS has approved the additional `ST-CDCU` IAM roles, groups, and policies
 - [ ] GitHub environment named `prod` created with at least one required reviewer
 
@@ -22,16 +26,37 @@ Fill these in `terraform.tfvars` for each environment:
 
 | Variable | Source |
 |---|---|
-| `terraform_role_arn` | BPI MS / deployment access setup |
+| `terraform_role_arn` | BPI MS deployment role ARN. Must be a role ARN, not a user ARN |
 | `vpc_id` | BPI MS network baseline |
 | `subnet_id` / `subnet_ids` | BPI MS network baseline |
 | `availability_zone` | Must match the Glue subnet |
 | `existing_security_group_id` | BPI MS network/security baseline |
-| `terraform_lock_table_name` | DynamoDB lock table used by Terraform state locking |
+| `terraform_lock_table_name` | DynamoDB lock table used by Terraform state locking; should match the backend lock table for the target environment unless BPI MS intentionally uses another table |
 | `existing_quicksight_access_role_arn` | Optional BPI-managed QuickSight role reference, if required |
 | `existing_kms_key_arn` | Manual KMS baseline, required when KMS is enabled |
 | `git_repository_url` | GitHub repository URL for SageMaker code repository |
 | `quicksight_admin_principal_arn` | Existing QuickSight user/group owner, if not using Terraform-created group |
+| `microsite_jdbc_url` | JDBC URL for the BPI MS Microsite MySQL RDS source |
+| `legacy_jdbc_url` | JDBC URL for the BPI MS Legacy MySQL RDS source |
+| `github_org` / `github_repo` | GitHub repository identifiers used by IAM/OIDC-related inputs |
+| `sso_principal_arns` | BPI MS approved SSO principal ARNs for human-facing roles, if applicable |
+| `glue_worker_count` / `glue_worker_type` | BPI MS approved Glue capacity settings |
+| `enable_sagemaker_unified_studio` | Whether to create SageMaker Studio resources |
+| `sagemaker_studio_user_profile_names` | SageMaker Studio user profiles to provision |
+| `sagemaker_studio_space_instance_type` | JupyterLab Space instance type |
+| `sagemaker_studio_space_volume_size_gb` | JupyterLab Space EBS volume size |
+| `sagemaker_studio_app_network_access_type` | SageMaker Studio app network mode, typically `VpcOnly` |
+| `enable_quicksight` | Whether Terraform should create QuickSight resources |
+| `quicksight_spice_capacity_gb` | Approved SPICE capacity setting |
+
+The backend configuration uses these remote state lock tables:
+
+| Environment | Backend lock table |
+|---|---|
+| `pre-prod` | `cdcu-terraform-locks-pre-prod` |
+| `prod` | `cdcu-terraform-locks-prod` |
+
+Set `terraform_lock_table_name` to the same environment-specific table unless BPI MS provides a different approved lock table name for the IAM policy.
 
 Terraform checks the required external IDs before provisioning CDCU services. Glue and SageMaker execution roles are created by the `modules/iam` module using the `ST-CDCU` prefix.
 
@@ -45,6 +70,40 @@ cdcu/{environment}/legacy-mysql-connection
 ```
 
 Terraform does not create secret values and does not read `secret_string`, so database credentials are not stored in Terraform state. BPI MS / authorized operators should create and populate these secrets outside Terraform.
+
+Glue connections also require non-local JDBC URLs in `terraform.tfvars`:
+
+```hcl
+microsite_jdbc_url = "jdbc:mysql://<bpi-microsite-rds-endpoint>:3306/<database>"
+legacy_jdbc_url    = "jdbc:mysql://<bpi-legacy-rds-endpoint>:3306/<database>"
+```
+
+The variables reject `localhost` values so test placeholders are not accidentally deployed to BPI MS environments.
+
+## QuickSight
+
+QuickSight resources are controlled by `enable_quicksight`.
+
+Set `enable_quicksight = true` only after BPI MS confirms:
+
+- QuickSight is enabled in `ap-southeast-1`
+- The namespace/user/group setup is ready
+- `quicksight_admin_principal_arn` is available and approved
+- SPICE capacity is approved
+
+If QuickSight is not ready, set `enable_quicksight = false` for the first infrastructure deployment and enable it in a later approved Terraform run.
+
+## EventBridge Automation
+
+Current Terraform IAM includes human Cloud Engineering permissions to manage CDCU EventBridge rules scoped to `rule/cdcu-*`.
+
+S3 upload -> EventBridge -> Glue crawler automation is not enabled unless BPI MS separately approves the additional service-side components:
+
+- An EventBridge execution role trusted by `events.amazonaws.com`
+- A policy on that role allowing `glue:StartCrawler` on `crawler/cdcu-*`
+- S3 bucket EventBridge notifications for the approved upload prefixes
+
+Keep this automation as a separate approval item because it introduces a new service trust relationship.
 
 ## Deployment
 
@@ -61,6 +120,8 @@ terraform apply tfplan
 ```
 
 For production, run the same flow from `environments/prod`.
+
+Run Terraform from the environment folder only. Running `terraform init`, `validate`, or `plan` from the repository root will not validate this project because the root folder is not a Terraform root module.
 
 ## Post-Deployment Checks
 

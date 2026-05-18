@@ -832,7 +832,7 @@ Failed to call ec2:DescribeSubnets: You are not authorized to perform this opera
 User: arn:aws:sts::<account-id>:assumed-role/ST-CDCU-pre-prod-GlueExecutionRole/GlueJobRunnerSession
 is not authorized to perform: ec2:DescribeSubnets because no identity-based policy allows the
 ec2:DescribeSubnets action
-VPC Id not found for subnet subnet-0d3103b0eba8bb171 and availability zone ap-southeast-1a
+VPC Id not found for subnet subnet-<your-subnet-id> and availability zone ap-southeast-1a
 ```
 
 **Cause:** When a Glue job runs inside a VPC (which is required for JDBC connections to RDS), Glue needs EC2 permissions to locate the subnet, security group, and VPC, and to create/delete the network interface for the job runner. The `ST-CDCU-pre-prod-GlueCrawlerAndETL` policy only had Glue service actions — the required EC2 VPC placement actions were missing.
@@ -875,23 +875,23 @@ terraform apply tfplan
 
 **Error:**
 ```
-VPC S3 endpoint validation failed for SubnetId: subnet-0d3103b0eba8bb171.
-VPC: vpc-00b620cb44f4a3935.
+VPC S3 endpoint validation failed for SubnetId: subnet-<your-subnet-id>.
+VPC: vpc-<your-vpc-id>.
 Reason: Could not find S3 endpoint or NAT gateway for subnetId:
-subnet-0d3103b0eba8bb171 in Vpc vpc-00b620cb44f4a3935
+subnet-<your-subnet-id> in Vpc vpc-<your-vpc-id>
 ```
 
-**Cause:** After fixing the EC2 VPC placement permissions (Error 19), Glue successfully placed itself inside the VPC but could not reach S3 to write job output. The VPC has an S3 Gateway endpoint (`vpce-056b1e0fc60b51bb1`) but it had **no route tables associated** with it:
+**Cause:** After fixing the EC2 VPC placement permissions (Error 19), Glue successfully placed itself inside the VPC but could not reach S3 to write job output. The VPC has an S3 Gateway endpoint (`vpce-<your-s3-endpoint-id>`) but it had **no route tables associated** with it:
 
 ```powershell
 aws ec2 describe-vpc-endpoints `
-  --filters "Name=vpc-endpoint-id,Values=vpce-056b1e0fc60b51bb1" `
+  --filters "Name=vpc-endpoint-id,Values=vpce-<your-s3-endpoint-id>" `
   --region ap-southeast-1 `
   --query "VpcEndpoints[0].RouteTableIds"
 # Returns: []
 ```
 
-The subnet `subnet-0d3103b0eba8bb171` has no explicit route table association so it uses the VPC main route table (`rtb-02a84c37f5e593af6`). Since the S3 endpoint was not associated with any route table, traffic to S3 had no valid route and Glue validation failed.
+The subnet `subnet-<your-subnet-id>` has no explicit route table association so it uses the VPC main route table (`rtb-<your-route-table-id>`). Since the S3 endpoint was not associated with any route table, traffic to S3 had no valid route and Glue validation failed.
 
 **Scope:** Network configuration — outside Terraform scope. VPC and route tables are manually managed by BPI MS.
 
@@ -901,24 +901,24 @@ Step 1 — Confirm the subnet uses the VPC main route table:
 ```powershell
 # Explicit association check (returns null if using main route table)
 aws ec2 describe-route-tables `
-  --filters "Name=association.subnet-id,Values=subnet-0d3103b0eba8bb171" `
+  --filters "Name=association.subnet-id,Values=subnet-<your-subnet-id>" `
   --region ap-southeast-1 `
   --query "RouteTables[0].RouteTableId"
 # Returns: null
 
 # Get the main route table
 aws ec2 describe-route-tables `
-  --filters "Name=vpc-id,Values=vpc-00b620cb44f4a3935" "Name=association.main,Values=true" `
+  --filters "Name=vpc-id,Values=vpc-<your-vpc-id>" "Name=association.main,Values=true" `
   --region ap-southeast-1 `
   --query "RouteTables[0].RouteTableId"
-# Returns: rtb-02a84c37f5e593af6
+# Returns: rtb-<your-route-table-id>
 ```
 
 Step 2 — Associate the S3 Gateway endpoint with the main route table:
 ```powershell
 aws ec2 modify-vpc-endpoint `
-  --vpc-endpoint-id vpce-056b1e0fc60b51bb1 `
-  --add-route-table-ids rtb-02a84c37f5e593af6 `
+  --vpc-endpoint-id vpce-<your-s3-endpoint-id> `
+  --add-route-table-ids rtb-<your-route-table-id> `
   --region ap-southeast-1
 ```
 

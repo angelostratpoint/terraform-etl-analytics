@@ -133,7 +133,7 @@ For Glue to reach the RDS instances, BPI MS must confirm:
 
 | Requirement | Details |
 |---|---|
-| RDS security group inbound rule | Allow port `3306` from the Glue security group (`sg-0a8de74edb2553215` in pre-prod) |
+| RDS security group inbound rule | Allow port `3306` from the Glue security group (the `existing_security_group_id` value from `terraform.tfvars`) |
 | S3 Gateway VPC endpoint | Must be associated with the route table used by the Glue subnet |
 | Glue subnet route | Must have a route to the RDS subnet |
 

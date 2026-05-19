@@ -36,20 +36,25 @@ variable "availability_zone" {
   default     = "ap-southeast-1a"
 }
 
+# Reserved for future use — SSO trust policy pending BPI MS approval. Not currently passed to any module.
 variable "sso_principal_arns" {
   description = "SSO principal ARNs allowed to assume human-facing IAM roles"
   type        = list(string)
   default     = []
 }
 
+# Reserved for future use — OIDC trust policy pending BPI MS approval. Not currently passed to any module.
 variable "github_org" {
   description = "GitHub organization name for OIDC trust"
   type        = string
+  default     = ""
 }
 
+# Reserved for future use — OIDC trust policy pending BPI MS approval. Not currently passed to any module.
 variable "github_repo" {
   description = "GitHub repository name for OIDC trust"
   type        = string
+  default     = ""
 }
 
 variable "enable_kms" {
@@ -58,6 +63,7 @@ variable "enable_kms" {
   default     = true
 }
 
+# Reserved for future use — CloudWatch alarms pending BPI MS approval. Not currently passed to any module.
 variable "sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarm notifications"
   type        = string
@@ -131,10 +137,12 @@ variable "sagemaker_studio_app_network_access_type" {
   default     = "VpcOnly"
 }
 
+# Disabled by default — validate QuickSight access model in sandbox before enabling.
+# See docs/errors-and-resolutions.md Error 24 for context.
 variable "enable_quicksight" {
   description = "Whether to provision QuickSight data source and dataset resources"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "quicksight_admin_principal_arn" {

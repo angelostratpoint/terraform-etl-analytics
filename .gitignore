@@ -27,6 +27,11 @@ crash.*.log
 secrets.json
 credentials
 
+# Local sandbox fixtures and CLI helper payloads
+local-fixtures/
+dummy_*.csv
+environments/*/lf-*.json
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -1065,6 +1065,104 @@ SELECT * FROM "cdcu_pre_prod_catalog"."matching" LIMIT 10
 
 ---
 
+## Error 24: QuickSight / IAM Alignment Review - AthenaQueryRole and Permission Wiring
+
+**Context:** Review of the BPI-MS IAM policy alignment found several QuickSight and IAM
+items that are important before enabling QuickSight in BPI-MS pre-prod/prod.
+
+**Observed gaps:**
+
+1. `ST-CDCU-{env}-AthenaQueryRole` is created with trust principal
+   `quicksight.amazonaws.com`, but `modules/quicksight/main.tf` does not pass that role
+   into `aws_quicksight_data_source.athena`.
+2. `modules/quicksight/` does not currently accept an `execution_role_arn` or
+   `service_role_arn` input for the Athena data source.
+3. `data_source_owner_permissions` and `dataset_owner_permissions` locals are computed
+   in `modules/quicksight/main.tf`, but are not currently applied to the QuickSight data
+   source or dataset.
+4. `iam:PassRole` is intentionally approval-only, but scoped PassRole may be needed for
+   Terraform deployment and for creating/updating Glue or SageMaker jobs that reference
+   execution roles.
+5. `ST-CDCU-{env}-AmazonQDeveloperAccess` exists as a policy but is not attached to any
+   group because `ST-CDCU-{env}-CloudEngineering` is already at the AWS 10 managed policy
+   attachment limit.
+6. `GlueS3Access` includes `s3:PutBucketVersioning`, which is bucket administration
+   access and not required by Glue ETL runtime execution.
+
+**Files reviewed:**
+
+- `modules/iam/main.tf`
+- `modules/iam/outputs.tf`
+- `modules/quicksight/main.tf`
+- `modules/quicksight/variables.tf`
+- `environments/pre-prod/main.tf`
+- `environments/prod/main.tf`
+
+**Cause:** The current implementation separates core CDCU workload IAM from several
+approval-only or account-level items. QuickSight service access is especially sensitive
+because QuickSight may use account-level service access settings rather than a
+Terraform-wired role on the data source resource. The existing `AthenaQueryRole` is
+created and output for review, but it is not currently consumed by the QuickSight module.
+
+**Resolution path for Stratpoint sandbox testing:**
+
+1. Keep the first core infrastructure test focused on S3, Glue, SageMaker, Athena, IAM,
+   and artifacts.
+2. Because QuickSight is already working in the Stratpoint sandbox, enable it only in a
+   second validation pass after the core stack is healthy:
+
+   ```hcl
+   enable_quicksight              = true
+   quicksight_admin_principal_arn = "<sandbox-quicksight-user-or-group-arn>"
+   ```
+
+3. Validate whether the sandbox QuickSight account service access can query:
+   - `cdcu-{env}-workgroup`
+   - `cdcu-{env}-athena-results`
+   - the CDCU Glue Data Catalog database and tables
+4. Validate whether the created QuickSight data source and dataset are visible and usable
+   by the configured admin principal.
+5. If the admin principal cannot access the assets, add explicit QuickSight permission
+   resources in a later code update. Do not add inline `permission` blocks to
+   `aws_quicksight_data_source` or `aws_quicksight_data_set`; earlier testing showed
+   those blocks are not supported on these resources.
+6. If QuickSight cannot query Athena/S3/Glue, confirm whether the sandbox uses an
+   account-level QuickSight service role. If so, document the account-level QuickSight
+   access requirement for BPI-MS instead of forcing the `AthenaQueryRole` into the
+   Terraform data source.
+
+**Recommended future code/documentation updates:**
+
+- Reclassify `ST-CDCU-{env}-AthenaQueryRole` as an intended/review role unless sandbox
+  testing confirms a Terraform-supported way to wire it directly to QuickSight.
+- Add QuickSight data source and dataset permission resources if the admin principal
+  needs explicit asset ownership.
+- Keep `iam:PassRole` out of the default ST-CDCU group policies until BPI-MS approves a
+  scoped exception. If approved, scope it only to:
+
+  ```text
+  arn:aws:iam::<account-id>:role/ST-CDCU-{env}-GlueExecutionRole
+  arn:aws:iam::<account-id>:role/ST-CDCU-{env}-SageMakerExecutionRole
+  ```
+
+- Document Amazon Q individual assignment using this policy ARN pattern:
+
+  ```text
+  arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
+  ```
+
+- Consider splitting S3 permissions in a future least-privilege pass:
+  - Runtime data lake access for Glue/SageMaker/DE: object read/write/list/delete as
+    approved.
+  - Bucket versioning administration: CloudEngineering or Terraform deployment role only.
+
+> For BPI MS environment: Treat QuickSight, scoped PassRole, Amazon Q user assignment,
+> and S3 bucket versioning administration as explicit review/approval topics. The
+> Stratpoint sandbox should be used to prove the QuickSight access model before enabling
+> QuickSight in BPI-MS pre-prod/prod.
+
+---
+
 ## Notes for BPI MS Environment
 
 - Errors 1 and 2 are one-time machine setup issues and will not recur on a properly configured CI/CD runner.
@@ -1077,3 +1175,322 @@ SELECT * FROM "cdcu_pre_prod_catalog"."matching" LIMIT 10
 - Errors 19, 21, and 22 — Glue execution role requires EC2 VPC placement permissions, both `/aws/glue/*` and `/aws-glue/*` CloudWatch log group paths, and all batch partition actions (`BatchGetPartition`, `BatchCreatePartition`, `BatchDeletePartition`). Include all from the start.
 - Error 23 — Glue catalog database names must use underscores only. Hyphens from environment names must be replaced using `replace(var.environment, "-", "_")` in `modules/glue/main.tf`.
 - Error 20 — S3 Gateway endpoint must be associated with the route table used by the Glue subnet before any Glue job runs. This is a BPI MS network prerequisite outside Terraform scope.
+- Error 24 — QuickSight IAM role wiring, QuickSight asset permissions, scoped PassRole, Amazon Q individual attachment, and S3 bucket versioning permissions remain governance/alignment items to validate in the Stratpoint sandbox before BPI-MS enablement.
+
+## Error 25: Glue Crawler Failed — Lake Formation Permissions Not Granted
+
+**Command:** `aws glue start-crawler --name cdcu-pre-prod-microsite-raw-crawler`
+
+**Error:**
+```
+Status: FAILED
+ErrorMessage: Insufficient Lake Formation permission(s): Required Describe on
+cdcu_pre_prod_catalog (Database name: cdcu_pre_prod_catalog)
+(Service: AWSGlue; Status Code: 400; Error Code: AccessDeniedException)
+```
+
+**Cause:** The Stratpoint sandbox account has AWS Lake Formation enabled. When Lake
+Formation is active, it acts as an additional permission layer on top of IAM. The Glue
+crawler's execution role (`ST-CDCU-pre-prod-GlueExecutionRole`) had the correct IAM
+permissions but Lake Formation had not granted it access to the Glue catalog database.
+IAM permissions alone are not sufficient when Lake Formation is enabled on the account.
+
+**Scope:** Sandbox-specific. In the BPI MS environment, Lake Formation governance must
+be confirmed with BPI MS before running crawlers or Glue jobs.
+
+**Resolution:**
+
+Step 1 — Check current Lake Formation admin settings:
+```powershell
+aws lakeformation get-data-lake-settings --region ap-southeast-1
+```
+
+Step 2 — Add your IAM user as Lake Formation admin using a JSON file
+(PowerShell inline JSON fails due to quote stripping — always use `file://`):
+
+Create `lf-settings.json`:
+```json
+{
+  "DataLakeAdmins": [
+    {"DataLakePrincipalIdentifier": "arn:aws:iam::<account-id>:user/<your-iam-user>"}
+  ],
+  "CreateDatabaseDefaultPermissions": [],
+  "CreateTableDefaultPermissions": []
+}
+```
+
+```powershell
+aws lakeformation put-data-lake-settings `
+  --region ap-southeast-1 `
+  --data-lake-settings file://lf-settings.json
+```
+
+Step 3 — Grant the Glue execution role access to the catalog database.
+
+Create `lf-db-resource.json`:
+```json
+{"Database":{"Name":"cdcu_pre_prod_catalog"}}
+```
+
+```powershell
+aws lakeformation grant-permissions `
+  --region ap-southeast-1 `
+  --principal DataLakePrincipalIdentifier="arn:aws:iam::<account-id>:role/ST-CDCU-pre-prod-GlueExecutionRole" `
+  --resource file://lf-db-resource.json `
+  --permissions "ALL"
+```
+
+Step 4 — Grant the Glue execution role access to all tables in the database.
+
+Create `lf-table-resource.json`:
+```json
+{"Table":{"DatabaseName":"cdcu_pre_prod_catalog","TableWildcard":{}}}
+```
+
+```powershell
+aws lakeformation grant-permissions `
+  --region ap-southeast-1 `
+  --principal DataLakePrincipalIdentifier="arn:aws:iam::<account-id>:role/ST-CDCU-pre-prod-GlueExecutionRole" `
+  --resource file://lf-table-resource.json `
+  --permissions "ALL"
+```
+
+Step 5 — Verify grants were applied:
+```powershell
+aws lakeformation list-permissions `
+  --region ap-southeast-1 `
+  --query "PrincipalResourcePermissions[?Principal.DataLakePrincipalIdentifier.contains(@,'ST-CDCU')]"
+```
+
+Step 6 — Re-run the crawlers:
+```powershell
+aws glue start-crawler --name cdcu-pre-prod-microsite-raw-crawler --region ap-southeast-1
+aws glue start-crawler --name cdcu-pre-prod-legacy-raw-crawler --region ap-southeast-1
+```
+
+> **Important — PowerShell JSON handling:** Never pass JSON inline in PowerShell for
+> Lake Formation commands. PowerShell strips double quotes from inline JSON strings,
+> causing `Invalid JSON` errors. Always write the JSON to a file and reference it
+> with `file://filename.json`.
+
+> **For BPI MS environment:** Confirm with BPI MS whether Lake Formation is enabled
+> on the target account before running any Glue crawlers or jobs. If enabled, BPI MS
+> must grant the ST-CDCU Glue execution role the necessary Lake Formation permissions
+> on `cdcu_pre_prod_catalog` before the pipeline can run.
+
+---
+
+## Error 26: Athena Query Failed — `COLUMN_NOT_FOUND` After Lake Formation Enabled
+
+**Location:** Amazon Athena query editor / SageMaker Unified Studio query editor
+
+**Error:**
+```
+COLUMN_NOT_FOUND: line 1:8: Relation contains no accessible columns
+Query Id: 04866ec3-59c5-478d-8298-259ae1a935d0
+```
+
+**Cause:** Even after the Glue crawlers succeeded (Error 25 fix) and tables were
+registered in the Glue catalog, Athena queries failed because Lake Formation had not
+granted column-level access to the querying IAM user (`stratpoint-gelo`). Lake Formation
+enforces permissions at the column level — without an explicit `SELECT` grant on the
+table columns, Athena can see the table exists but cannot read any columns from it.
+
+**Scope:** Sandbox-specific. Affects any IAM user or role querying Athena when Lake
+Formation is enabled on the account.
+
+**Resolution:**
+
+Step 1 — Grant `DESCRIBE` on the database to the querying user:
+```powershell
+aws lakeformation grant-permissions `
+  --region ap-southeast-1 `
+  --principal DataLakePrincipalIdentifier="arn:aws:iam::<account-id>:user/<your-iam-user>" `
+  --resource file://lf-db-resource.json `
+  --permissions "DESCRIBE"
+```
+
+Step 2 — Grant `SELECT` on all columns of the `microsite` table.
+
+Create `lf-microsite-columns.json`:
+```json
+{"TableWithColumns":{"DatabaseName":"cdcu_pre_prod_catalog","Name":"microsite","ColumnWildcard":{}}}
+```
+
+```powershell
+aws lakeformation grant-permissions `
+  --region ap-southeast-1 `
+  --principal DataLakePrincipalIdentifier="arn:aws:iam::<account-id>:user/<your-iam-user>" `
+  --resource file://lf-microsite-columns.json `
+  --permissions "SELECT"
+```
+
+Step 3 — Grant `SELECT` on all columns of the `legacy` table.
+
+Create `lf-legacy-columns.json`:
+```json
+{"TableWithColumns":{"DatabaseName":"cdcu_pre_prod_catalog","Name":"legacy","ColumnWildcard":{}}}
+```
+
+```powershell
+aws lakeformation grant-permissions `
+  --region ap-southeast-1 `
+  --principal DataLakePrincipalIdentifier="arn:aws:iam::<account-id>:user/<your-iam-user>" `
+  --resource file://lf-legacy-columns.json `
+  --permissions "SELECT"
+```
+
+Step 4 — Retry the Athena query in SageMaker Unified Studio or Athena console:
+```sql
+SELECT * FROM cdcu_pre_prod_catalog.microsite LIMIT 10;
+SELECT * FROM cdcu_pre_prod_catalog.legacy LIMIT 10;
+```
+
+Expected: Query returns rows from the dummy CSV data.
+
+> **For BPI MS environment:** When Lake Formation is enabled, every IAM principal
+> that needs to query Athena must have explicit Lake Formation column-level grants.
+> This includes the QuickSight service role, the ST-CDCU AthenaQueryRole, and any
+> human users running queries. BPI MS must include Lake Formation grants as part of
+> the pre-deployment baseline setup alongside IAM permissions.
+
+> **Note on PowerShell:** Always use `file://` for all Lake Formation CLI commands
+> in PowerShell. Inline JSON will always fail due to PowerShell quote handling.
+> See Error 25 for details.
+
+---
+
+## Notes for BPI MS Environment
+
+- Errors 1 and 2 are one-time machine setup issues and will not recur on a properly configured CI/CD runner.
+- Error 3 must be resolved by running the bootstrap steps before any `terraform init` in the BPI MS account.
+- Errors 5 and 6 are code fixes already applied to the repository — they will not recur.
+- Error 7 requires BPI MS to provide the deployment role ARN before running Terraform in their account.
+- Errors 8, 9, and 13 all stem from the same root cause: the AWS hard limit of 10 policies per IAM group. Always count CE group attachments before any apply.
+- Errors 14, 15, and 16 are superseded by Error 17 — the classic notebook instance approach was incorrect. The correct 3.3.3 deliverable is a Studio JupyterLab space via `aws_sagemaker_space`.
+- Error 18 is a code fix already applied — `ownership_settings` in `aws_sagemaker_space` only accepts `owner_user_profile_name`.
+- Errors 19, 21, and 22 — Glue execution role requires EC2 VPC placement permissions, both `/aws/glue/*` and `/aws-glue/*` CloudWatch log group paths, and all batch partition actions (`BatchGetPartition`, `BatchCreatePartition`, `BatchDeletePartition`). Include all from the start.
+- Error 23 — Glue catalog database names must use underscores only. Hyphens from environment names must be replaced using `replace(var.environment, "-", "_")` in `modules/glue/main.tf`.
+- Error 20 — S3 Gateway endpoint must be associated with the route table used by the Glue subnet before any Glue job runs. This is a BPI MS network prerequisite outside Terraform scope.
+- Error 24 — QuickSight IAM role wiring, QuickSight asset permissions, scoped PassRole, Amazon Q individual attachment, and S3 bucket versioning permissions remain governance/alignment items to validate in the Stratpoint sandbox before BPI-MS enablement.
+- Errors 25 and 26 — If Lake Formation is enabled on the BPI MS account, explicit Lake Formation grants are required for the Glue execution role (database + table + column access) and for any IAM principal querying Athena (column-level SELECT grants). IAM permissions alone are not sufficient when Lake Formation is active. Always use `file://` for Lake Formation CLI commands in PowerShell.
+
+---
+
+## Error 27: QuickSight Athena Dataset Failed - Lake Formation `DESCRIBE` Missing
+
+**Location:** Amazon QuickSight Athena data source / table picker / custom SQL editor
+
+**Error:**
+```text
+sourceErrorCode: 1502
+sourceErrorMessage: Query execution failed: Insufficient permissions to execute the query.
+Insufficient Lake Formation permission(s): Required Describe on cdcu_pre_prod_catalog
+sourceException: java.sql.SQLException
+sourceType: ATHENA
+```
+
+QuickSight UI symptom:
+```text
+Choose your table -> AwsDataCatalog -> No tables found
+```
+
+Custom SQL symptom:
+```text
+You don't have sufficient AWS Lake Formation permissions to perform this action.
+Contact your administrator for assistance.
+```
+
+**Cause:** The Glue database and Athena tables existed, and Athena CLI queries worked
+for the IAM user, but QuickSight could not list or query the tables because Lake
+Formation was enforcing permissions for the QuickSight access path.
+
+In the Stratpoint sandbox, granting only the IAM QuickSight service role was not enough
+for the QuickSight authoring UI. Lake Formation also needed explicit grants for the
+QuickSight user and/or QuickSight author group ARN:
+
+```text
+arn:aws:iam::<account-id>:role/service-role/aws-quicksight-service-role-v0
+arn:aws:quicksight:ap-southeast-1:<account-id>:user/default/<quicksight-user>
+arn:aws:quicksight:ap-southeast-1:<account-id>:group/default/cdcu-pre-prod-authors
+```
+
+**Observed sandbox validation:**
+
+- Glue database existed: `cdcu_pre_prod_catalog`
+- Glue tables existed: `legacy`, `microsite`
+- Athena workgroup existed: `cdcu-pre-prod-workgroup`
+- Athena CLI query worked against `cdcu_pre_prod_catalog.microsite`
+- QuickSight data source existed and pointed to `cdcu-pre-prod-workgroup`
+- QuickSight still failed until Lake Formation grants were added to QuickSight principals
+
+**Resolution:** Grant Lake Formation database `DESCRIBE`, table `DESCRIBE`, and column
+`SELECT` to all QuickSight principals that participate in authoring/querying:
+
+```text
+arn:aws:iam::<account-id>:role/service-role/aws-quicksight-service-role-v0
+arn:aws:quicksight:ap-southeast-1:<account-id>:user/default/<quicksight-user>
+arn:aws:quicksight:ap-southeast-1:<account-id>:group/default/cdcu-pre-prod-authors
+```
+
+Use `file://` JSON inputs in PowerShell.
+
+`lf-db-resource.json`:
+```json
+{"Database":{"Name":"cdcu_pre_prod_catalog"}}
+```
+
+`lf-table-resource.json`:
+```json
+{"Table":{"DatabaseName":"cdcu_pre_prod_catalog","TableWildcard":{}}}
+```
+
+Example grant for the QuickSight author group:
+```powershell
+aws lakeformation grant-permissions `
+  --principal DataLakePrincipalIdentifier=arn:aws:quicksight:ap-southeast-1:<account-id>:group/default/cdcu-pre-prod-authors `
+  --resource file://lf-db-resource.json `
+  --permissions DESCRIBE `
+  --region ap-southeast-1
+```
+
+```powershell
+aws lakeformation grant-permissions `
+  --principal DataLakePrincipalIdentifier=arn:aws:quicksight:ap-southeast-1:<account-id>:group/default/cdcu-pre-prod-authors `
+  --resource file://lf-table-resource.json `
+  --permissions DESCRIBE SELECT `
+  --region ap-southeast-1
+```
+
+Verify grants:
+```powershell
+aws lakeformation list-permissions `
+  --region ap-southeast-1 `
+  --query "PrincipalResourcePermissions[?contains(Principal.DataLakePrincipalIdentifier, 'quicksight') && (Resource.Database.Name=='cdcu_pre_prod_catalog' || Resource.Table.DatabaseName=='cdcu_pre_prod_catalog' || Resource.TableWithColumns.DatabaseName=='cdcu_pre_prod_catalog')]"
+```
+
+Retry QuickSight after refreshing or signing out/signing in. If the table picker remains
+stale, test custom SQL:
+
+```sql
+SELECT *
+FROM cdcu_pre_prod_catalog.legacy
+LIMIT 10;
+```
+
+```sql
+SELECT *
+FROM cdcu_pre_prod_catalog.microsite
+LIMIT 10;
+```
+
+**Important:** The final Terraform QuickSight dataset expects the processed matching
+table, currently named `processed_matching`. That table will not appear until processed
+matching output exists in S3 and the processed matching crawler has run. During sandbox
+testing, `legacy` and `microsite` only prove the QuickSight -> Athena -> Glue -> S3
+connection path.
+
+> **For BPI MS environment:** If Lake Formation is enabled, BPI MS must grant CDCU
+> database/table/column access not only to IAM roles, but also to the relevant QuickSight
+> user/group principals used by authors. This is separate from IAM policy access and
+> separate from QuickSight data source permissions.

@@ -9,6 +9,9 @@ This directory contains AWS Glue ETL scripts for the **standardization phase** o
 | `microsite_standardization.py` | Reads raw Microsite data from S3, applies cleaning rules, and writes Parquet to `s3://.../standardized/microsite/` |
 | `legacy_standardization.py` | Reads raw Legacy data from S3, applies cleaning rules, and writes Parquet to `s3://.../standardized/legacy/` |
 
+See `source-to-target-standardization-checklist.md` for the DA/DE-owned source-to-target
+cleanup checklist and the Terraform-provisioned data lake prefixes.
+
 ## File Type
 
 `*.py` — PySpark scripts compatible with AWS Glue 4.0 (Python 3)

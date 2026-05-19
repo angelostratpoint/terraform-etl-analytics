@@ -2,10 +2,25 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  account_id    = data.aws_caller_identity.current.account_id
-  region        = data.aws_region.current.name
-  env           = var.environment
-  secret_prefix = "cdcu/${local.env}/"
+  account_id                 = data.aws_caller_identity.current.account_id
+  region                     = data.aws_region.current.name
+  env                        = var.environment
+  secret_prefix              = "cdcu/${local.env}/"
+  glue_catalog_database_name = "cdcu_${replace(local.env, "-", "_")}_catalog"
+
+  glue_catalog_arn    = "arn:aws:glue:${local.region}:${local.account_id}:catalog"
+  glue_database_arn   = "arn:aws:glue:${local.region}:${local.account_id}:database/${local.glue_catalog_database_name}"
+  glue_table_arn      = "arn:aws:glue:${local.region}:${local.account_id}:table/${local.glue_catalog_database_name}/*"
+  glue_crawler_arn    = "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-*"
+  glue_job_arn        = "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-*"
+  glue_connection_arn = "arn:aws:glue:${local.region}:${local.account_id}:connection/cdcu-*"
+
+  sagemaker_processing_job_arn  = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-*"
+  sagemaker_training_job_arn    = "arn:aws:sagemaker:${local.region}:${local.account_id}:training-job/cdcu-*"
+  sagemaker_model_arn           = "arn:aws:sagemaker:${local.region}:${local.account_id}:model/cdcu-*"
+  sagemaker_endpoint_config_arn = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint-config/cdcu-*"
+  sagemaker_endpoint_arn        = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint/cdcu-*"
+  sagemaker_pipeline_arn        = "arn:aws:sagemaker:${local.region}:${local.account_id}:pipeline/cdcu-*"
 }
 
 ###############################################################################
@@ -98,8 +113,7 @@ resource "aws_iam_policy" "glue_s3" {
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
-          "s3:GetBucketVersioning",
-          "s3:PutBucketVersioning"
+          "s3:GetBucketVersioning"
         ]
         Resource = var.data_lake_bucket_arn
       }
@@ -116,21 +130,56 @@ resource "aws_iam_policy" "glue_etl" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "GlueCrawlerAndETL"
+        Sid    = "GlueCatalogAccess"
         Effect = "Allow"
         Action = [
           "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
           "glue:GetTable", "glue:GetTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
           "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
+          "glue:BatchGetPartition"
+        ]
+        Resource = [
+          local.glue_catalog_arn,
+          local.glue_database_arn,
+          local.glue_table_arn
+        ]
+      },
+      {
+        Sid    = "GlueCrawlerAccess"
+        Effect = "Allow"
+        Action = [
           "glue:CreateCrawler", "glue:UpdateCrawler", "glue:DeleteCrawler",
-          "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler",
+          "glue:GetCrawler", "glue:StartCrawler", "glue:StopCrawler"
+        ]
+        Resource = local.glue_crawler_arn
+      },
+      {
+        Sid    = "GlueJobAccess"
+        Effect = "Allow"
+        Action = [
           "glue:CreateJob", "glue:UpdateJob", "glue:DeleteJob",
-          "glue:GetJob", "glue:GetJobs", "glue:StartJobRun",
-          "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun",
+          "glue:GetJob", "glue:StartJobRun",
+          "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun"
+        ]
+        Resource = local.glue_job_arn
+      },
+      {
+        Sid    = "GlueConnectionAccess"
+        Effect = "Allow"
+        Action = [
           "glue:GetConnection", "glue:CreateConnection", "glue:UpdateConnection",
-          "glue:DeleteConnection", "glue:GetConnections",
-          "glue:GetSecurityConfiguration",
-          "glue:BatchGetPartition", "glue:BatchCreatePartition", "glue:BatchDeletePartition"
+          "glue:DeleteConnection"
+        ]
+        Resource = local.glue_connection_arn
+      },
+      {
+        Sid    = "GlueListAndSecurityConfigurationRead"
+        Effect = "Allow"
+        Action = [
+          "glue:GetCrawlers",
+          "glue:GetJobs",
+          "glue:GetConnections",
+          "glue:GetSecurityConfiguration"
         ]
         Resource = "*"
       },
@@ -263,18 +312,33 @@ resource "aws_iam_policy" "sagemaker_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SageMakerAccess"
+        Sid    = "SageMakerCDCUWorkloadAccess"
         Effect = "Allow"
         Action = [
           "sagemaker:CreateProcessingJob", "sagemaker:DescribeProcessingJob",
-          "sagemaker:StopProcessingJob", "sagemaker:ListProcessingJobs",
+          "sagemaker:StopProcessingJob",
           "sagemaker:CreateTrainingJob", "sagemaker:DescribeTrainingJob",
-          "sagemaker:StopTrainingJob", "sagemaker:ListTrainingJobs",
+          "sagemaker:StopTrainingJob",
           "sagemaker:CreateModel", "sagemaker:DescribeModel",
           "sagemaker:CreateEndpointConfig", "sagemaker:DescribeEndpointConfig",
           "sagemaker:CreateEndpoint", "sagemaker:DescribeEndpoint", "sagemaker:InvokeEndpoint",
           "sagemaker:CreatePipeline", "sagemaker:StartPipelineExecution",
-          "sagemaker:DescribePipeline", "sagemaker:DescribePipelineExecution",
+          "sagemaker:DescribePipeline", "sagemaker:DescribePipelineExecution"
+        ]
+        Resource = [
+          local.sagemaker_processing_job_arn,
+          local.sagemaker_training_job_arn,
+          local.sagemaker_model_arn,
+          local.sagemaker_endpoint_config_arn,
+          local.sagemaker_endpoint_arn,
+          local.sagemaker_pipeline_arn
+        ]
+      },
+      {
+        Sid    = "SageMakerStudioControlPlaneAccess"
+        Effect = "Allow"
+        Action = [
+          "sagemaker:ListProcessingJobs", "sagemaker:ListTrainingJobs",
           "sagemaker:ListSpaces", "sagemaker:DescribeSpace",
           "sagemaker:ListApps", "sagemaker:DescribeApp",
           "sagemaker:CreateApp", "sagemaker:DeleteApp",
@@ -439,7 +503,11 @@ resource "aws_iam_policy" "athena_access" {
           "glue:GetPartition",
           "glue:GetPartitions"
         ]
-        Resource = "*"
+        Resource = [
+          local.glue_catalog_arn,
+          local.glue_database_arn,
+          local.glue_table_arn
+        ]
       }
     ]
   })

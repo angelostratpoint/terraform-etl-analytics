@@ -54,8 +54,13 @@ Assumed by `glue.amazonaws.com`. Used by all Glue ETL jobs and crawlers.
 
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
-| `S3DataLakeAccess` | S3 | GetObject, PutObject, DeleteObject, ListBucket, GetBucketVersioning, PutBucketVersioning | `cdcu-{env}-data-lake` bucket |
-| `GlueCrawlerAndETL` | Glue | Full crawler, job, catalog, connection actions (see note below) | `*` |
+| `S3DataLakeObjectAccess` | S3 | GetObject, PutObject, DeleteObject | `cdcu-{env}-data-lake/*` objects |
+| `S3DataLakeBucketAccess` | S3 | ListBucket, GetBucketVersioning | `cdcu-{env}-data-lake` bucket |
+| `GlueCatalogAccess` | Glue | Database, table, partition, and BatchGetPartition actions | CDCU Glue catalog, database, and table ARNs |
+| `GlueCrawlerAccess` | Glue | CreateCrawler, UpdateCrawler, DeleteCrawler, GetCrawler, StartCrawler, StopCrawler | `crawler/cdcu-*` |
+| `GlueJobAccess` | Glue | CreateJob, UpdateJob, DeleteJob, GetJob, StartJobRun, GetJobRun, GetJobRuns, BatchStopJobRun | `job/cdcu-*` |
+| `GlueConnectionAccess` | Glue | GetConnection, CreateConnection, UpdateConnection, DeleteConnection | `connection/cdcu-*` |
+| `GlueListAndSecurityConfigurationRead` | Glue | GetCrawlers, GetJobs, GetConnections, GetSecurityConfiguration | `*` |
 | `SecretsManagerRead` | Secrets Manager | GetSecretValue, DescribeSecret | `cdcu/{env}/*` secrets |
 | `CloudWatchLogsGlueWriteRead` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, GetLogEvents | `/aws/glue/*`, `/aws-glue/*`, and log-stream ARNs |
 | `CloudWatchLogsGlueDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
@@ -73,7 +78,8 @@ jobs, training jobs, and pipelines.
 
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
-| `SageMakerAccess` | SageMaker | Processing, training, model, endpoint, pipeline, Studio domain/user profile, JupyterLab space/app, presigned domain URL, and tag actions | `*` |
+| `SageMakerCDCUWorkloadAccess` | SageMaker | Processing, training, model, endpoint, and pipeline actions | `processing-job/cdcu-*`, `training-job/cdcu-*`, `model/cdcu-*`, `endpoint-config/cdcu-*`, `endpoint/cdcu-*`, and `pipeline/cdcu-*` |
+| `SageMakerStudioControlPlaneAccess` | SageMaker | Studio domain/user profile, JupyterLab space/app, list, presigned domain URL, and tag actions | `*` where required by SageMaker control-plane APIs |
 | `S3DataLakeAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-data-lake` bucket |
 | `CloudWatchLogsSageMakerWriteRead` | CloudWatch Logs | CreateLogGroup, CreateLogStream, PutLogEvents, GetLogEvents | `/aws/sagemaker/*` and log-stream ARNs |
 | `CloudWatchLogsSageMakerDescribe` | CloudWatch Logs | DescribeLogGroups, DescribeLogStreams | `*` |
@@ -94,7 +100,7 @@ the Glue Data Catalog.
 |---|---|---|---|
 | `AthenaAccess` | Athena | StartQueryExecution, GetQueryExecution, GetQueryResults, StopQueryExecution, ListQueryExecutions, GetWorkGroup, ListWorkGroups | `cdcu-{env}-workgroup` ARN |
 | `AthenaResultsAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-athena-results` bucket |
-| `AthenaGlueCatalogAccess` | Glue | GetDatabase, GetDatabases, GetTable, GetTables, GetPartition, GetPartitions | `*` |
+| `AthenaGlueCatalogAccess` | Glue | GetDatabase, GetDatabases, GetTable, GetTables, GetPartition, GetPartitions | CDCU Glue catalog, database, and table ARNs |
 
 ---
 
@@ -128,9 +134,9 @@ Access for Data Engineers working on ETL scripts, SageMaker Studio/JupyterLab sp
 
 | Policy Sid | Service | Actions | Resource Scope |
 |---|---|---|---|
-| `S3DataLakeAccess` | S3 | GetObject, PutObject, DeleteObject, ListBucket, GetBucketVersioning, PutBucketVersioning | `cdcu-{env}-data-lake` bucket |
-| `GlueCrawlerAndETL` | Glue | Same as ST-CDCU-GlueExecutionRole | `*` |
-| `SageMakerAccess` | SageMaker | Same as ST-CDCU-SageMakerExecutionRole | `*` |
+| `S3DataLakeAccess` | S3 | GetObject, PutObject, DeleteObject, ListBucket, GetBucketVersioning | `cdcu-{env}-data-lake` bucket |
+| `GlueCrawlerAndETL` | Glue | Same as ST-CDCU-GlueExecutionRole | CDCU Glue resources, with limited `*` for AWS-required list/security/VPC placement APIs |
+| `SageMakerAccess` | SageMaker | Same as ST-CDCU-SageMakerExecutionRole | CDCU SageMaker workload ARNs, with limited `*` for Studio control-plane APIs |
 | `AthenaAccess` | Athena | Same as ST-CDCU-AthenaQueryRole | `cdcu-{env}-workgroup` ARN |
 | `AthenaResultsAccess` | S3 | GetObject, PutObject, ListBucket | `cdcu-{env}-athena-results` bucket |
 | `SecretsManagerReadAccess` | Secrets Manager | GetSecretValue, DescribeSecret, ListSecrets, ListSecretVersionIds, GetResourcePolicy, BatchGetSecretValue | `cdcu/{env}/*` secrets |

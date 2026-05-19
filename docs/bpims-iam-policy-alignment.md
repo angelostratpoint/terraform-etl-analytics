@@ -22,7 +22,12 @@ bootstrap resources.
 
 Amazon Q Developer access is intentionally not attached to the Cloud Engineering group
 because AWS IAM groups have a hard limit of 10 managed policy attachments. If approved,
-BPI-MS should grant the Amazon Q policy individually per user.
+BPI-MS should grant the Amazon Q policy individually per user using this policy ARN
+pattern:
+
+```text
+arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
+```
 
 ## Implemented Service Roles
 
@@ -30,7 +35,7 @@ BPI-MS should grant the Amazon Q policy individually per user.
 |---|---|---|
 | `ST-CDCU-{env}-GlueExecutionRole` | `glue.amazonaws.com` | Glue ETL jobs, crawlers, Glue connections, Secrets Manager read, and Glue log writes |
 | `ST-CDCU-{env}-SageMakerExecutionRole` | `sagemaker.amazonaws.com` | SageMaker Studio domain, user profiles, JupyterLab spaces, jobs, pipelines, S3 data lake access, and SageMaker log writes |
-| `ST-CDCU-{env}-AthenaQueryRole` | `quicksight.amazonaws.com` | QuickSight-to-Athena query execution and Glue Data Catalog metadata reads |
+| `ST-CDCU-{env}-AthenaQueryRole` | `quicksight.amazonaws.com` | Intended/review role for QuickSight-to-Athena query execution and Glue Data Catalog metadata reads. The current QuickSight module does not wire this role directly into `aws_quicksight_data_source.athena`. |
 
 ## Policy Alignment Notes
 
@@ -38,13 +43,36 @@ BPI-MS should grant the Amazon Q policy individually per user.
 |---|---|
 | S3 data lake | Object actions and bucket actions are split between bucket and object ARNs for BPI-MS least-privilege review. |
 | SageMaker S3 | Read/write/list only; no delete or versioning permissions. |
-| Glue | Includes catalog, table, partition, crawler, job, connection, `BatchGetPartition`, and VPC network-interface placement permissions needed for JDBC/RDS access. |
+| Glue | Catalog, table, partition, crawler, job, and connection permissions are scoped to CDCU Glue resources where AWS supports resource-level permissions. Glue list/read helpers and VPC network-interface placement permissions remain on `*` where AWS APIs require broad discovery/runtime scope. |
 | Athena | Terraform uses the `cdcu-{env}-workgroup` ARN and includes Athena results bucket access plus Glue Data Catalog metadata reads in the same managed policy. The access matrix may show these as separate rows for review clarity. |
 | CloudWatch Logs | Includes `/aws/glue/*`, `/aws-glue/*`, and `/aws/sagemaker/*` log groups plus log stream ARNs. Describe actions use `Resource = "*"` because AWS log discovery APIs commonly require it. |
 | Secrets Manager | Glue runtime gets `GetSecretValue` and `DescribeSecret`. Data Engineering gets `ListSecrets` on `*` plus read-only access scoped to `cdcu/{env}/*`. Terraform does not create, update, delete, or store secret values. |
 | DynamoDB | Cloud Engineering gets state-lock access only to `terraform_lock_table_name`. Environment defaults match backend tables: `cdcu-terraform-locks-pre-prod` and `cdcu-terraform-locks-prod`. |
 | EventBridge | Cloud Engineering can manage only `rule/cdcu-*`; explicit deny blocks mutating non-CDCU rules. |
+| SageMaker | CDCU processing/training/model/endpoint/pipeline actions are scoped to `cdcu-*` SageMaker ARNs. Studio control-plane and list/tag actions remain on `*` where the SageMaker APIs do not cleanly support the same CDCU resource scoping. |
 | Amazon Q | Conversation policy exists with `sts:SetContext` and explicit denies for plugin/admin/code-generation features, but is not attached to groups. |
+
+## QuickSight Alignment Notes
+
+QuickSight is available in the Stratpoint sandbox and should be validated there before
+BPI-MS pre-prod/prod enablement.
+
+Current Terraform creates QuickSight groups, an Athena data source, and a dataset when
+`enable_quicksight = true`. The module does not currently attach
+`ST-CDCU-{env}-AthenaQueryRole` to the QuickSight data source because the supported AWS
+QuickSight access model may be account-level service access rather than a direct role
+field on the Terraform data source resource.
+
+Validation path:
+
+1. Deploy the core stack first with QuickSight disabled.
+2. Enable QuickSight in the Stratpoint sandbox using a valid
+   `quicksight_admin_principal_arn`.
+3. Confirm whether QuickSight can query the CDCU Athena workgroup, access the Athena
+   results bucket, and read Glue Data Catalog metadata.
+4. If QuickSight assets are not visible to the admin principal, add explicit QuickSight
+   data source and dataset permission resources in a later code update. Do not use inline
+   permission blocks on `aws_quicksight_data_source` or `aws_quicksight_data_set`.
 
 ## Approval-Only Items
 
@@ -56,6 +84,7 @@ The following are not active Terraform permissions unless BPI-MS approves them s
 | EventBridge service execution role | Required only for S3 upload -> EventBridge -> Glue crawler automation. This needs a role trusted by `events.amazonaws.com` with `glue:StartCrawler` scoped to `crawler/cdcu-*`. |
 | S3 bucket EventBridge notification | Required only if automated S3 object upload events should trigger EventBridge. |
 | KMS runtime IAM policy | KMS key lifecycle and key policy remain BPI-MS owned. Terraform only consumes `existing_kms_key_arn` when `enable_kms = true`. |
+| S3 bucket versioning administration | Runtime Glue and DE S3 access excludes `s3:PutBucketVersioning`. Terraform manages bucket versioning through the deployment role and S3 module, not through the Glue runtime policy. |
 
 ## Sandbox Testing Guidance
 

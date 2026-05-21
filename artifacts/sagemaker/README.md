@@ -36,10 +36,10 @@ SageMaker Processing Jobs are invoked via AWS CLI or console:
 ```bash
 aws sagemaker create-processing-job \
   --processing-job-name cdcu-matching-job \
-  --role-arn arn:aws:iam::ACCOUNT:role/cdcu-pre-prod-sagemaker-execution-role \
+  --role-arn arn:aws:iam::ACCOUNT:role/cdcu-sit-sagemaker-execution-role \
   --app-specification ImageUri=683313688378.dkr.ecr.ap-southeast-1.amazonaws.com/sagemaker-scikit-learn:1.0-1-cpu-py3,ContainerEntrypoint=python3,ContainerArguments=/opt/ml/processing/input/code/matching_processor.py,--input-path,s3://bucket/standardized/,--output-path,s3://bucket/processed/ \
-  --processing-inputs SourceUri=s3://cdcu-pre-prod-data-lake/pre-prod/sagemaker-scripts/matching_processor.py,Destination=/opt/ml/processing/input/code \
-  --processing-outputs SourceUri=/opt/ml/processing/output,Destination=s3://cdcu-pre-prod-data-lake/processed/matching/
+  --processing-inputs SourceUri=s3://cdcu-sit-data-lake/sit/sagemaker-scripts/matching_processor.py,Destination=/opt/ml/processing/input/code \
+  --processing-outputs SourceUri=/opt/ml/processing/output,Destination=s3://cdcu-sit-data-lake/processed/matching/
 ```
 
 ## S3 Upload Path

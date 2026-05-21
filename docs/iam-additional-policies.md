@@ -17,7 +17,6 @@ BPI MS will review, approve, and execute the Terraform scripts. Stratpoint provi
 | Resource naming prefix | `ST-CDCU` |
 | Target region | `ap-southeast-1` |
 | Active BPI-MS Terraform environments | `sit`, `uat`, `prod` |
-| Legacy/sandbox environment | `pre-prod` |
 | Terraform module path | `modules/iam/` |
 | Executed by | BPI MS Cloud Engineer |
 | Prepared by | Stratpoint Cloud Engineering |
@@ -42,9 +41,8 @@ as input variables only — it does not create or modify them.
 
 ## Latest BPI-MS Governance Notes
 
-The repository now includes the approved SIT/UAT/Prod environment roots. The legacy
-`pre-prod` root remains temporarily for sandbox/reference use and should not be used for
-new BPI-MS deployments.
+The repository now includes only the approved SIT/UAT/Prod environment roots for BPI-MS
+deployment.
 
 BPI-MS will provide/review the required IAM policy resources per group:
 
@@ -242,12 +240,6 @@ environments/uat/main.tf       →  module "iam" { source = "../../modules/iam" 
 environments/prod/main.tf      →  module "iam" { source = "../../modules/iam" }
 ```
 
-The legacy sandbox root remains temporarily:
-
-```text
-environments/pre-prod/main.tf  ->  module "iam" { source = "../../modules/iam" }
-```
-
 Once the IAM module runs, `module.iam.glue_execution_role_arn` and
 `module.iam.sagemaker_execution_role_arn` replace the `existing_*` input variables
 that were previously filled manually in `terraform.tfvars`.
@@ -271,7 +263,6 @@ that were previously filled manually in `terraform.tfvars`.
 
 Additional checklist items from the latest BPI-MS meeting:
 
-- [ ] Confirm when the legacy `pre-prod` root can be retired after state/migration review
 - [ ] Confirm Terraform should create only the approved Secrets Manager containers and never create secret values
 - [ ] Confirm Lake Formation admins and CDCU database/table grants for Glue, Athena, and QuickSight principals
 - [ ] Confirm CodePipeline access is later scope and not required for Phase 1
@@ -279,7 +270,7 @@ Additional checklist items from the latest BPI-MS meeting:
 Before running `terraform apply` on the IAM module:
 
 - [ ] Confirm `ST-CDCU` prefix is acceptable for resource naming in BPI MS account
-- [ ] Confirm Terraform lock table name matches the backend table, such as `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod`
+- [ ] Confirm Terraform lock table name matches the backend table, such as `cdcu-terraform-locks-sit`, `cdcu-terraform-locks-uat`, or `cdcu-terraform-locks-prod`
 - [ ] Confirm `q:PassRequest` removal is acknowledged — it is not a valid IAM action
 - [ ] Confirm Secrets Manager write/delete access is **not** granted to Stratpoint roles — BPI MS owns secret values
 - [ ] Provide CE access to Stratpoint once scripts are reviewed and approved

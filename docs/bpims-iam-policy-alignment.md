@@ -24,9 +24,7 @@ prod/
 
 Terraform now includes `environments/sit/`, `environments/uat/`, and
 `environments/prod/` roots for the approved BPI-MS environment model.
-`environments/pre-prod/` remains temporarily as a legacy/sandbox root and should not be
-used for new BPI-MS deployments. This document uses `{env}` to represent the approved
-environment name.
+This document uses `{env}` to represent the approved environment name.
 
 BPI-MS will provide and review IAM policy resources by group, especially Cloud
 Engineering, Data Engineering, and QA. Terraform may create CDCU-scoped `ST-CDCU`
@@ -88,7 +86,7 @@ arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
 | CloudWatch Logs | Includes `/aws/glue/*`, `/aws-glue/*`, and `/aws/sagemaker/*` log groups plus log stream ARNs. Describe actions use `Resource = "*"` because AWS log discovery APIs commonly require it. |
 | Secrets Manager | Glue runtime gets `GetSecretValue` and `DescribeSecret`. Data Engineering gets `ListSecrets` on `*` plus read-only access scoped to `cdcu/{env}/*`. Terraform does not create, update, delete, or store secret values. |
 | Lake Formation | Not yet implemented in Terraform. If enabled by BPI-MS, CDCU-scoped grants are required for Glue, Athena, and QuickSight principals in addition to IAM. |
-| DynamoDB | Cloud Engineering gets state-lock access only to `terraform_lock_table_name`. Environment defaults match backend tables: `cdcu-terraform-locks-pre-prod` and `cdcu-terraform-locks-prod`. |
+| DynamoDB | Cloud Engineering gets state-lock access only to `terraform_lock_table_name`. Environment defaults match backend tables: `cdcu-terraform-locks-sit`, `cdcu-terraform-locks-uat`, and `cdcu-terraform-locks-prod`. |
 | EventBridge | Cloud Engineering can manage only `rule/cdcu-*`; explicit deny blocks mutating non-CDCU rules. |
 | SageMaker | CDCU processing/training/model/endpoint/pipeline actions are scoped to `cdcu-*` SageMaker ARNs. Studio control-plane and list/tag actions remain on `*` where the SageMaker APIs do not cleanly support the same CDCU resource scoping. |
 | Amazon Q | Conversation policy exists with `sts:SetContext` and explicit denies for plugin/admin/code-generation features, but is not attached to groups. |

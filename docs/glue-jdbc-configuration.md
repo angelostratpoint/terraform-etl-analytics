@@ -121,7 +121,7 @@ to the `ST-CDCU-{env}-GlueExecutionRole` scoped to `cdcu/{env}/*` secrets only.
 6. Test the connection by running the extraction job:
    ```powershell
    aws glue start-job-run `
-     --job-name "cdcu-pre-prod-microsite-raw-extraction" `
+     --job-name "cdcu-sit-microsite-raw-extraction" `
      --region ap-southeast-1
    ```
 
@@ -139,4 +139,4 @@ For Glue to reach the RDS instances, BPI MS must confirm:
 
 These are network-level prerequisites outside Terraform scope — owned and managed by BPI MS.
 See `docs/errors-and-resolutions.md` Error 19 and Error 20 for related VPC issues encountered
-during pre-prod testing.
+during sit testing.

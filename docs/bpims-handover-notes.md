@@ -21,8 +21,7 @@ the `ST-CDCU` naming prefix for the additional IAM roles and groups requested by
 | Data Engineering group | `ST-CDCU-{env}-DataEngineering` |
 | QA group | `ST-CDCU-{env}-QA` |
 
-`{env}` is `sit`, `uat`, or `prod` for new BPI-MS deployments. The legacy `pre-prod`
-root remains temporarily for sandbox/reference use only.
+`{env}` is `sit`, `uat`, or `prod` for BPI-MS deployments.
 
 ---
 
@@ -61,7 +60,7 @@ Terraform does not create or modify the following BPI MS baseline resources:
 ## Terraform Deployment Role Setup (Action Required by BPI MS IT)
 
 Terraform requires an IAM identity to assume when provisioning CDCU resources.
-The recommended approach is an IAM role. An IAM user is acceptable for pre-prod
+The recommended approach is an IAM role. An IAM user is acceptable for sit
 testing only — it must not be used in production.
 
 ### IAM Role vs IAM User — Why It Matters
@@ -75,7 +74,7 @@ testing only — it must not be used in production.
 | BPI MS security baseline | Likely blocked by existing deny policies | Standard enterprise pattern |
 | Compliance | Risky for PII data environment | Required for banking/financial compliance |
 
-> **For pre-prod testing:** IAM user is acceptable if BPI MS IT cannot set up the
+> **For sit testing:** IAM user is acceptable if BPI MS IT cannot set up the
 > role before testing starts. Migrate to IAM role before production.
 >
 > **For production:** IAM role is non-negotiable. Production handles real customer
@@ -96,15 +95,15 @@ with the ARN.
 |---|---|
 | Trusted entity type | `AWS account` |
 | Account ID | BPI MS AWS account ID |
-| Role name | `cdcu-pre-prod-terraform-deployment-role` |
-| Description | `Terraform deployment role for CDCU pre-prod infrastructure` |
+| Role name | `cdcu-sit-terraform-deployment-role` |
+| Description | `Terraform deployment role for CDCU sit infrastructure` |
 
 **Tags:**
 
 | Key | Value |
 |---|---|
 | Project | CDCU |
-| Environment | pre-prod |
+| Environment | sit |
 | ManagedBy | Manual |
 | Owner | BPI MS |
 
@@ -171,7 +170,7 @@ Please fill these values in each environment's `terraform.tfvars` before running
 | `existing_security_group_id` | BPI MS security baseline | Always |
 | `existing_kms_key_arn` | BPI MS KMS baseline | Prod only when `enable_kms = true` |
 | `existing_quicksight_access_role_arn` | BPI MS QuickSight setup | Optional reference |
-| `terraform_lock_table_name` | DynamoDB lock table name | Must match backend table: `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod` |
+| `terraform_lock_table_name` | DynamoDB lock table name | Must match backend table: `cdcu-terraform-locks-sit` or `cdcu-terraform-locks-prod` |
 
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are
 deprecated compatibility inputs. The active environment roots use the ST-CDCU roles
@@ -193,11 +192,10 @@ Current repository state:
 environments/sit/
 environments/uat/
 environments/prod/
-environments/pre-prod/  # legacy/sandbox root retained temporarily
 ```
 
 This separation is cleaner for approval gates, access control, testing evidence, and
-production readiness. Treat `pre-prod` as a temporary legacy/sandbox root only.
+production readiness.
 
 ---
 
@@ -381,6 +379,5 @@ aws athena get-work-group --work-group cdcu-sit-workgroup --region ap-southeast-
 | 8 | Grant CE access to Stratpoint after scripts are reviewed and approved | BPI MS |
 | 9 | Migrate from IAM user to IAM role before UAT/prod if Option B was used temporarily | BPI MS IT |
 | 10 | Run `terraform apply` on UAT and prod after sign-off | BPI MS Cloud Engineer |
-| 11 | Retire the legacy `pre-prod` root after migration/state decisions are confirmed | Stratpoint / BPI-MS review |
 | 12 | Add Secrets Manager container module if approved | Stratpoint / BPI-MS review |
 | 13 | Add CDCU-scoped Lake Formation grants if enabled | Stratpoint / BPI-MS review |

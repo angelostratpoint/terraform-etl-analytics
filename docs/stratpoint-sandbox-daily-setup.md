@@ -1,6 +1,6 @@
 # CDCU Stratpoint Sandbox — Daily Network Setup Guide
 
-> Note: This guide records the earlier Stratpoint pre-prod sandbox setup. After the
+> Note: This guide records the earlier Stratpoint sit sandbox setup. After the
 > SIT/UAT/Prod environment split, use environments/sit for new sandbox-style
 > validation unless you are intentionally reproducing the older test path.
 
@@ -17,16 +17,16 @@ baseline network environment. They are NOT managed by Terraform.
 
 | Resource | Name | Required By |
 |---|---|---|
-| VPC | `cdcu-pre-prod-vpc` | Glue, SageMaker |
-| Private Subnet | `cdcu-pre-prod-private-subnet-1a` | Glue connections, SageMaker Studio |
-| Security Group | `cdcu-pre-prod-sg` | Glue JDBC, SageMaker VPC placement |
-| S3 Gateway Endpoint | `cdcu-pre-prod-s3-endpoint` | Glue jobs writing to S3 (Error 20 fix) |
-| Secrets Manager Endpoint | `cdcu-pre-prod-secretsmanager-endpoint` | Glue reading MySQL credentials at runtime |
-| Glue Endpoint | `cdcu-pre-prod-glue-endpoint` | Glue service API calls from inside VPC |
-| CloudWatch Logs Endpoint | `cdcu-pre-prod-logs-endpoint` | Glue and SageMaker log writes |
-| Terraform State Bucket | `cdcu-terraform-state-pre-prod-<account-id>` | Terraform remote state |
-| Terraform Lock Table | `cdcu-terraform-locks-pre-prod` | Terraform state locking |
-| Secrets Manager Secrets | `cdcu/pre-prod/*` | Glue MySQL connections |
+| VPC | `cdcu-sit-vpc` | Glue, SageMaker |
+| Private Subnet | `cdcu-sit-private-subnet-1a` | Glue connections, SageMaker Studio |
+| Security Group | `cdcu-sit-sg` | Glue JDBC, SageMaker VPC placement |
+| S3 Gateway Endpoint | `cdcu-sit-s3-endpoint` | Glue jobs writing to S3 (Error 20 fix) |
+| Secrets Manager Endpoint | `cdcu-sit-secretsmanager-endpoint` | Glue reading MySQL credentials at runtime |
+| Glue Endpoint | `cdcu-sit-glue-endpoint` | Glue service API calls from inside VPC |
+| CloudWatch Logs Endpoint | `cdcu-sit-logs-endpoint` | Glue and SageMaker log writes |
+| Terraform State Bucket | `cdcu-terraform-state-sit-<account-id>` | Terraform remote state |
+| Terraform Lock Table | `cdcu-terraform-locks-sit` | Terraform state locking |
+| Secrets Manager Secrets | `cdcu/sit/*` | Glue MySQL connections |
 
 ---
 
@@ -59,7 +59,7 @@ Expected output:
 | Field | Value |
 |---|---|
 | Resources to create | `VPC only` |
-| Name tag | `cdcu-pre-prod-vpc` |
+| Name tag | `cdcu-sit-vpc` |
 | IPv4 CIDR | `10.0.0.0/16` |
 | IPv6 CIDR block | No IPv6 CIDR block |
 | Tenancy | Default |
@@ -70,7 +70,7 @@ Expected output:
 | Key | Value |
 |---|---|
 | Project | CDCU |
-| Environment | pre-prod |
+| Environment | sit |
 | ManagedBy | Manual |
 | Owner | Stratpoint |
 
@@ -85,8 +85,8 @@ Expected output:
 
 | Field | Value |
 |---|---|
-| VPC ID | Select `cdcu-pre-prod-vpc` |
-| Subnet name | `cdcu-pre-prod-private-subnet-1a` |
+| VPC ID | Select `cdcu-sit-vpc` |
+| Subnet name | `cdcu-sit-private-subnet-1a` |
 | Availability Zone | `ap-southeast-1a` |
 | IPv4 VPC CIDR block | `10.0.0.0/16` |
 | IPv4 subnet CIDR block | `10.0.1.0/24` |
@@ -98,7 +98,7 @@ Expected output:
 | Key | Value |
 |---|---|
 | Project | CDCU |
-| Environment | pre-prod |
+| Environment | sit |
 | ManagedBy | Manual |
 | Owner | Stratpoint |
 
@@ -113,9 +113,9 @@ Expected output:
 
 | Field | Value |
 |---|---|
-| Security group name | `cdcu-pre-prod-sg` |
-| Description | `CDCU pre-prod security group for Glue and SageMaker` |
-| VPC | Select `cdcu-pre-prod-vpc` |
+| Security group name | `cdcu-sit-sg` |
+| Description | `CDCU sit security group for Glue and SageMaker` |
+| VPC | Select `cdcu-sit-vpc` |
 
 **Inbound rules — add these 2 rules:**
 
@@ -125,7 +125,7 @@ Expected output:
 | HTTPS | TCP | 443 | `10.0.0.0/16` | VPC internal HTTPS for SageMaker and endpoints |
 
 > To add the self-referencing rule: in the Source field, start typing
-> `cdcu-pre-prod-sg` and select it from the dropdown.
+> `cdcu-sit-sg` and select it from the dropdown.
 >
 > The self-referencing rule is an AWS Glue hard requirement. Without it,
 > Glue JDBC connections fail even if all IAM permissions are correct.
@@ -137,7 +137,7 @@ Expected output:
 | Key | Value |
 |---|---|
 | Project | CDCU |
-| Environment | pre-prod |
+| Environment | sit |
 | ManagedBy | Manual |
 | Owner | Stratpoint |
 
@@ -156,10 +156,10 @@ endpoints (require the SG from Step 4).
 
 | Field | Value |
 |---|---|
-| Name tag | `cdcu-pre-prod-s3-endpoint` |
+| Name tag | `cdcu-sit-s3-endpoint` |
 | Type | AWS services |
 | Service name | `com.amazonaws.ap-southeast-1.s3` — select **Gateway** type |
-| VPC | `cdcu-pre-prod-vpc` |
+| VPC | `cdcu-sit-vpc` |
 | Route tables | ✅ Check the main route table (e.g. `rtb-041f1bc85d37f41b5`) |
 | Policy | Full access |
 
@@ -167,46 +167,46 @@ endpoints (require the SG from Step 4).
 
 | Field | Value |
 |---|---|
-| Name tag | `cdcu-pre-prod-secretsmanager-endpoint` |
+| Name tag | `cdcu-sit-secretsmanager-endpoint` |
 | Type | AWS services |
 | Service name | `com.amazonaws.ap-southeast-1.secretsmanager` — **Interface** |
-| VPC | `cdcu-pre-prod-vpc` |
-| Subnet | `cdcu-pre-prod-private-subnet-1a` |
-| Security group | `cdcu-pre-prod-sg` |
+| VPC | `cdcu-sit-vpc` |
+| Subnet | `cdcu-sit-private-subnet-1a` |
+| Security group | `cdcu-sit-sg` |
 | Policy | Full access |
 
 ### Endpoint 3 — Glue (Interface)
 
 | Field | Value |
 |---|---|
-| Name tag | `cdcu-pre-prod-glue-endpoint` |
+| Name tag | `cdcu-sit-glue-endpoint` |
 | Type | AWS services |
 | Service name | `com.amazonaws.ap-southeast-1.glue` — **Interface** |
-| VPC | `cdcu-pre-prod-vpc` |
-| Subnet | `cdcu-pre-prod-private-subnet-1a` |
-| Security group | `cdcu-pre-prod-sg` |
+| VPC | `cdcu-sit-vpc` |
+| Subnet | `cdcu-sit-private-subnet-1a` |
+| Security group | `cdcu-sit-sg` |
 | Policy | Full access |
 
 ### Endpoint 4 — CloudWatch Logs (Interface)
 
 | Field | Value |
 |---|---|
-| Name tag | `cdcu-pre-prod-logs-endpoint` |
+| Name tag | `cdcu-sit-logs-endpoint` |
 | Type | AWS services |
 | Service name | `com.amazonaws.ap-southeast-1.logs` — **Interface** |
-| VPC | `cdcu-pre-prod-vpc` |
-| Subnet | `cdcu-pre-prod-private-subnet-1a` |
-| Security group | `cdcu-pre-prod-sg` |
+| VPC | `cdcu-sit-vpc` |
+| Subnet | `cdcu-sit-private-subnet-1a` |
+| Security group | `cdcu-sit-sg` |
 | Policy | Full access |
 
 ### Expected Endpoints After All 4 Are Created
 
 | Name | Type | Status |
 |---|---|---|
-| `cdcu-pre-prod-s3-endpoint` | Gateway | Available |
-| `cdcu-pre-prod-secretsmanager-endpoint` | Interface | Available |
-| `cdcu-pre-prod-glue-endpoint` | Interface | Available |
-| `cdcu-pre-prod-logs-endpoint` | Interface | Available (takes ~1 min) |
+| `cdcu-sit-s3-endpoint` | Gateway | Available |
+| `cdcu-sit-secretsmanager-endpoint` | Interface | Available |
+| `cdcu-sit-glue-endpoint` | Interface | Available |
+| `cdcu-sit-logs-endpoint` | Interface | Available (takes ~1 min) |
 
 ---
 
@@ -221,7 +221,7 @@ Run in PowerShell:
 ```powershell
 # Create S3 state bucket with account ID suffix
 aws s3api create-bucket `
-  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
+  --bucket cdcu-terraform-state-sit-<sandbox-account-id> `
   --region ap-southeast-1 `
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 ```
@@ -229,22 +229,22 @@ aws s3api create-bucket `
 Expected output:
 ```json
 {
-    "Location": "http://cdcu-terraform-state-pre-prod-<sandbox-account-id>.s3.amazonaws.com/",
-    "BucketArn": "arn:aws:s3:::cdcu-terraform-state-pre-prod-<sandbox-account-id>"
+    "Location": "http://cdcu-terraform-state-sit-<sandbox-account-id>.s3.amazonaws.com/",
+    "BucketArn": "arn:aws:s3:::cdcu-terraform-state-sit-<sandbox-account-id>"
 }
 ```
 
 ```powershell
 # Enable versioning
 aws s3api put-bucket-versioning `
-  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
+  --bucket cdcu-terraform-state-sit-<sandbox-account-id> `
   --versioning-configuration Status=Enabled
 ```
 
 ```powershell
 # Block public access
 aws s3api put-public-access-block `
-  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
+  --bucket cdcu-terraform-state-sit-<sandbox-account-id> `
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
@@ -252,7 +252,7 @@ aws s3api put-public-access-block `
 # Create DynamoDB lock table
 # DynamoDB is account-scoped so no suffix needed
 aws dynamodb create-table `
-  --table-name cdcu-terraform-locks-pre-prod `
+  --table-name cdcu-terraform-locks-sit `
   --attribute-definitions AttributeName=LockID,AttributeType=S `
   --key-schema AttributeName=LockID,KeyType=HASH `
   --billing-mode PAY_PER_REQUEST `
@@ -262,7 +262,7 @@ aws dynamodb create-table `
 ```powershell
 # Wait for table to become ACTIVE
 aws dynamodb wait table-exists `
-  --table-name cdcu-terraform-locks-pre-prod `
+  --table-name cdcu-terraform-locks-sit `
   --region ap-southeast-1
 ```
 
@@ -270,10 +270,10 @@ No output from the wait command = table is ACTIVE.
 
 Verify both exist:
 ```powershell
-aws s3api head-bucket --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id>
+aws s3api head-bucket --bucket cdcu-terraform-state-sit-<sandbox-account-id>
 
 aws dynamodb describe-table `
-  --table-name cdcu-terraform-locks-pre-prod `
+  --table-name cdcu-terraform-locks-sit `
   --region ap-southeast-1 `
   --query "Table.TableStatus"
 ```
@@ -285,15 +285,15 @@ Expected: `"ACTIVE"`
 ## Step 7 — Update backend.tf
 
 After creating the bucket with the account ID suffix, update
-`environments/pre-prod/backend.tf` to match:
+`environments/sit/backend.tf` to match:
 
 ```hcl
 terraform {
   backend "s3" {
-    bucket         = "cdcu-terraform-state-pre-prod-<sandbox-account-id>"
-    key            = "cdcu/pre-prod/terraform.tfstate"
+    bucket         = "cdcu-terraform-state-sit-<sandbox-account-id>"
+    key            = "cdcu/sit/terraform.tfstate"
     region         = "ap-southeast-1"
-    dynamodb_table = "cdcu-terraform-locks-pre-prod"
+    dynamodb_table = "cdcu-terraform-locks-sit"
     encrypt        = true
   }
 }
@@ -308,8 +308,8 @@ Real credentials will be provided by BPI MS in their environment.
 
 ```powershell
 aws secretsmanager create-secret `
-  --name "cdcu/pre-prod/microsite-mysql-connection" `
-  --description "CDCU pre-prod Microsite MySQL placeholder" `
+  --name "cdcu/sit/microsite-mysql-connection" `
+  --description "CDCU sit Microsite MySQL placeholder" `
   --secret-string '{\"host\":\"placeholder.rds.amazonaws.com\",\"port\":\"3306\",\"dbname\":\"cdcu\",\"username\":\"cdcu_user\",\"password\":\"placeholder\"}' `
   --region ap-southeast-1
 ```
@@ -317,16 +317,16 @@ aws secretsmanager create-secret `
 Expected output:
 ```json
 {
-    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/pre-prod/microsite-mysql-connection-HF0p8D",
-    "Name": "cdcu/pre-prod/microsite-mysql-connection",
+    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/sit/microsite-mysql-connection-HF0p8D",
+    "Name": "cdcu/sit/microsite-mysql-connection",
     "VersionId": "dc8f0740-f02d-43c5-97f9-5e4142e6c534"
 }
 ```
 
 ```powershell
 aws secretsmanager create-secret `
-  --name "cdcu/pre-prod/legacy-mysql-connection" `
-  --description "CDCU pre-prod Legacy MySQL placeholder" `
+  --name "cdcu/sit/legacy-mysql-connection" `
+  --description "CDCU sit Legacy MySQL placeholder" `
   --secret-string '{\"host\":\"placeholder.rds.amazonaws.com\",\"port\":\"3306\",\"dbname\":\"cdcu\",\"username\":\"cdcu_user\",\"password\":\"placeholder\"}' `
   --region ap-southeast-1
 ```
@@ -334,8 +334,8 @@ aws secretsmanager create-secret `
 Expected output:
 ```json
 {
-    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/pre-prod/legacy-mysql-connection-c4xfKz",
-    "Name": "cdcu/pre-prod/legacy-mysql-connection",
+    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/sit/legacy-mysql-connection-c4xfKz",
+    "Name": "cdcu/sit/legacy-mysql-connection",
     "VersionId": "ceb7436f-30e3-49f1-9e9b-a414dc4cb2b7"
 }
 ```
@@ -344,14 +344,14 @@ Verify both secrets exist:
 ```powershell
 aws secretsmanager list-secrets `
   --region ap-southeast-1 `
-  --query "SecretList[?starts_with(Name, 'cdcu/pre-prod')].Name"
+  --query "SecretList[?starts_with(Name, 'cdcu/sit')].Name"
 ```
 
 Expected:
 ```json
 [
-    "cdcu/pre-prod/microsite-mysql-connection",
-    "cdcu/pre-prod/legacy-mysql-connection"
+    "cdcu/sit/microsite-mysql-connection",
+    "cdcu/sit/legacy-mysql-connection"
 ]
 ```
 
@@ -359,11 +359,11 @@ Expected:
 
 ## Step 9 — Fill in terraform.tfvars
 
-Open `environments/pre-prod/terraform.tfvars` and fill in the values collected
+Open `environments/sit/terraform.tfvars` and fill in the values collected
 from Steps 2–4:
 
 ```hcl
-environment        = "pre-prod"
+environment        = "sit"
 terraform_role_arn = "arn:aws:iam::<sandbox-account-id>:role/<your-sandbox-deployment-role>"
 
 vpc_id    = "<vpc-id from Step 2>"
@@ -405,7 +405,7 @@ quicksight_admin_principal_arn = ""
 quicksight_spice_capacity_gb   = 10
 
 manage_iam                = false
-terraform_lock_table_name = "cdcu-terraform-locks-pre-prod"
+terraform_lock_table_name = "cdcu-terraform-locks-sit"
 
 existing_glue_execution_role_arn      = ""
 existing_sagemaker_execution_role_arn = ""
@@ -418,7 +418,7 @@ existing_kms_key_arn                  = ""
 ## Step 10 — Run Terraform
 
 ```powershell
-cd environments/pre-prod
+cd environments/sit
 
 terraform init
 terraform fmt -check -recursive ../../
@@ -436,18 +436,18 @@ terraform apply tfplan
 aws s3 ls --region ap-southeast-1 | findstr cdcu
 
 # Glue catalog database
-aws glue get-database --name cdcu_pre_prod_catalog --region ap-southeast-1
+aws glue get-database --name cdcu_sit_catalog --region ap-southeast-1
 
 # Athena workgroup
 aws athena get-work-group `
-  --work-group cdcu-pre-prod-workgroup `
+  --work-group cdcu-sit-workgroup `
   --region ap-southeast-1 `
   --query "WorkGroup.State"
 
 # SageMaker Studio domain
 aws sagemaker list-domains `
   --region ap-southeast-1 `
-  --query "Domains[?DomainName=='cdcu-pre-prod-studio'].Status"
+  --query "Domains[?DomainName=='cdcu-sit-studio'].Status"
 
 # IAM roles created
 aws iam list-roles `
@@ -495,8 +495,8 @@ Run `terraform destroy` when done with the sandbox session to avoid charges.
 - [ ] Secrets Manager Interface endpoint created and Available
 - [ ] Glue Interface endpoint created and Available
 - [ ] CloudWatch Logs Interface endpoint created and Available
-- [ ] S3 state bucket `cdcu-terraform-state-pre-prod-<sandbox-account-id>` exists
-- [ ] DynamoDB lock table `cdcu-terraform-locks-pre-prod` exists and is ACTIVE
-- [ ] `environments/pre-prod/backend.tf` bucket name matches the S3 state bucket
-- [ ] Both Secrets Manager secrets exist (`cdcu/pre-prod/microsite-mysql-connection` and `cdcu/pre-prod/legacy-mysql-connection`)
+- [ ] S3 state bucket `cdcu-terraform-state-sit-<sandbox-account-id>` exists
+- [ ] DynamoDB lock table `cdcu-terraform-locks-sit` exists and is ACTIVE
+- [ ] `environments/sit/backend.tf` bucket name matches the S3 state bucket
+- [ ] Both Secrets Manager secrets exist (`cdcu/sit/microsite-mysql-connection` and `cdcu/sit/legacy-mysql-connection`)
 - [ ] `terraform.tfvars` filled with current session IDs

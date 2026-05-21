@@ -14,8 +14,6 @@ environments/prod/
 ```
 
 This matrix uses `{env}` generically so it can apply to `sit`, `uat`, and `prod`.
-The legacy `environments/pre-prod/` root remains temporarily for sandbox/reference use
-and should not be used for new BPI-MS deployments.
 
 ## Service Roles
 
@@ -45,7 +43,7 @@ and should not be used for new BPI-MS deployments.
 | Secrets Manager | Read-only access to `cdcu/{env}/*` secrets; no create/update/delete/put secret value |
 | CloudWatch Logs | Glue and SageMaker log creation/write/read actions as appropriate per role/group |
 | EventBridge | Rule management scoped to `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
-| DynamoDB | Terraform state lock access to the configured environment backend table, such as `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod` |
+| DynamoDB | Terraform state lock access to the configured environment backend table, such as `cdcu-terraform-locks-sit`, `cdcu-terraform-locks-uat`, or `cdcu-terraform-locks-prod` |
 | Amazon Q | Console assistant conversation actions only, with `sts:SetContext` and explicit denies for plugin/admin/code-generation actions. Policy exists but is not attached to groups. |
 | Lake Formation | Not currently provisioned by Terraform. If BPI-MS enables Lake Formation, CDCU-scoped database/table grants are required for Glue, Athena, and QuickSight principals. |
 

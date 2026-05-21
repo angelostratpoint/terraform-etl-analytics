@@ -7,7 +7,6 @@ This workspace provisions the CDCU application service layer plus the additional
 The latest BPI-MS review confirmed these alignment decisions:
 
 - Target AWS environment separation is now represented by `environments/sit`, `environments/uat`, and `environments/prod`.
-- `environments/pre-prod` remains temporarily as a legacy/sandbox root and should not be used for new BPI-MS deployments.
 - BPI-MS will provide/review IAM policy resources by human group: Cloud Engineering, Data Engineering, and QA.
 - VPC configuration is read-only for this repository. Security group, subnet, and route suggestions may be documented for BPI-MS, but Terraform does not own enterprise networking.
 - Terraform should provision CDCU Secrets Manager secret containers for Microsite and Legacy, but must not provision secret values.

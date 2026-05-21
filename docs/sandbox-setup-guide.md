@@ -1,8 +1,8 @@
 # CDCU Sandbox Setup Guide
 
-This guide captures the original CDCU pre-prod sandbox setup flow used during early
+This guide captures the original CDCU sit sandbox setup flow used during early
 testing. After the SIT/UAT/Prod environment split, use `environments/sit` for new
-sandbox-style validation unless you are intentionally reproducing the older pre-prod
+sandbox-style validation unless you are intentionally reproducing the older sit
 test path.
 
 ---
@@ -43,34 +43,34 @@ Run this once on the sandbox account:
 ```powershell
 # Windows PowerShell — run from repo root
 aws s3api create-bucket `
-  --bucket cdcu-terraform-state-pre-prod `
+  --bucket cdcu-terraform-state-sit `
   --region ap-southeast-1 `
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 
 aws s3api put-bucket-versioning `
-  --bucket cdcu-terraform-state-pre-prod `
+  --bucket cdcu-terraform-state-sit `
   --versioning-configuration Status=Enabled
 
 aws s3api put-public-access-block `
-  --bucket cdcu-terraform-state-pre-prod `
+  --bucket cdcu-terraform-state-sit `
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
 aws dynamodb create-table `
-  --table-name cdcu-terraform-locks-pre-prod `
+  --table-name cdcu-terraform-locks-sit `
   --attribute-definitions AttributeName=LockID,AttributeType=S `
   --key-schema AttributeName=LockID,KeyType=HASH `
   --billing-mode PAY_PER_REQUEST `
   --region ap-southeast-1
 
 aws dynamodb wait table-exists `
-  --table-name cdcu-terraform-locks-pre-prod `
+  --table-name cdcu-terraform-locks-sit `
   --region ap-southeast-1
 ```
 
 Verify both exist:
 ```powershell
-aws s3api head-bucket --bucket cdcu-terraform-state-pre-prod
-aws dynamodb describe-table --table-name cdcu-terraform-locks-pre-prod --region ap-southeast-1 --query "Table.TableStatus"
+aws s3api head-bucket --bucket cdcu-terraform-state-sit
+aws dynamodb describe-table --table-name cdcu-terraform-locks-sit --region ap-southeast-1 --query "Table.TableStatus"
 ```
 
 ---
@@ -83,14 +83,14 @@ BPI MS will populate real credentials when the pipeline connects to their RDS.
 
 ```powershell
 aws secretsmanager create-secret `
-  --name "cdcu/pre-prod/microsite-mysql-connection" `
-  --description "CDCU pre-prod Microsite MySQL connection credentials" `
+  --name "cdcu/sit/microsite-mysql-connection" `
+  --description "CDCU sit Microsite MySQL connection credentials" `
   --secret-string '{\"host\":\"placeholder.rds.amazonaws.com\",\"port\":\"3306\",\"dbname\":\"cdcu\",\"username\":\"cdcu_user\",\"password\":\"placeholder\"}' `
   --region ap-southeast-1
 
 aws secretsmanager create-secret `
-  --name "cdcu/pre-prod/legacy-mysql-connection" `
-  --description "CDCU pre-prod Legacy MySQL connection credentials" `
+  --name "cdcu/sit/legacy-mysql-connection" `
+  --description "CDCU sit Legacy MySQL connection credentials" `
   --secret-string '{\"host\":\"placeholder.rds.amazonaws.com\",\"port\":\"3306\",\"dbname\":\"cdcu\",\"username\":\"cdcu_user\",\"password\":\"placeholder\"}' `
   --region ap-southeast-1
 ```
@@ -99,14 +99,14 @@ Verify both exist:
 ```powershell
 aws secretsmanager list-secrets `
   --region ap-southeast-1 `
-  --query "SecretList[?starts_with(Name, 'cdcu/pre-prod')].Name"
+  --query "SecretList[?starts_with(Name, 'cdcu/sit')].Name"
 ```
 
 Expected output:
 ```json
 [
-    "cdcu/pre-prod/microsite-mysql-connection",
-    "cdcu/pre-prod/legacy-mysql-connection"
+    "cdcu/sit/microsite-mysql-connection",
+    "cdcu/sit/legacy-mysql-connection"
 ]
 ```
 
@@ -114,7 +114,7 @@ Expected output:
 
 ## Step 4 — Fill in terraform.tfvars
 
-Open `environments/pre-prod/terraform.tfvars` and replace all `<FILL_IN: ...>` values
+Open `environments/sit/terraform.tfvars` and replace all `<FILL_IN: ...>` values
 with the actual sandbox values obtained in Step 1.
 
 Required fields to fill:
@@ -133,7 +133,7 @@ Leave `enable_quicksight = false` until QuickSight is confirmed in Step 6.
 ## Step 5 — Initialize and Deploy
 
 ```powershell
-cd environments/pre-prod
+cd environments/sit
 
 # Initialize — downloads providers and connects to remote state
 terraform init
@@ -186,28 +186,28 @@ Then re-run plan and apply.
 Once infrastructure is provisioned, upload the dummy data to test the pipeline:
 
 ```powershell
-cd environments/pre-prod
+cd environments/sit
 
-aws s3 cp dummy_microsite.csv s3://cdcu-pre-prod-data-lake/raw/microsite/dummy_microsite.csv --region ap-southeast-1
-aws s3 cp dummy_legacy.csv s3://cdcu-pre-prod-data-lake/raw/legacy/dummy_legacy.csv --region ap-southeast-1
+aws s3 cp dummy_microsite.csv s3://cdcu-sit-data-lake/raw/microsite/dummy_microsite.csv --region ap-southeast-1
+aws s3 cp dummy_legacy.csv s3://cdcu-sit-data-lake/raw/legacy/dummy_legacy.csv --region ap-southeast-1
 ```
 
 Run the raw crawlers to register tables in the Glue catalog:
 ```powershell
-aws glue start-crawler --name cdcu-pre-prod-microsite-raw-crawler --region ap-southeast-1
-aws glue start-crawler --name cdcu-pre-prod-legacy-raw-crawler --region ap-southeast-1
+aws glue start-crawler --name cdcu-sit-microsite-raw-crawler --region ap-southeast-1
+aws glue start-crawler --name cdcu-sit-legacy-raw-crawler --region ap-southeast-1
 ```
 
 Wait for crawlers to complete:
 ```powershell
-aws glue get-crawler --name cdcu-pre-prod-microsite-raw-crawler --region ap-southeast-1 --query "Crawler.State"
-aws glue get-crawler --name cdcu-pre-prod-legacy-raw-crawler --region ap-southeast-1 --query "Crawler.State"
+aws glue get-crawler --name cdcu-sit-microsite-raw-crawler --region ap-southeast-1 --query "Crawler.State"
+aws glue get-crawler --name cdcu-sit-legacy-raw-crawler --region ap-southeast-1 --query "Crawler.State"
 ```
 
 Verify tables in Athena:
 ```sql
-SELECT * FROM cdcu_pre_prod_catalog.microsite LIMIT 10;
-SELECT * FROM cdcu_pre_prod_catalog.legacy LIMIT 10;
+SELECT * FROM cdcu_sit_catalog.microsite LIMIT 10;
+SELECT * FROM cdcu_sit_catalog.legacy LIMIT 10;
 ```
 
 ---
@@ -266,10 +266,10 @@ aws glue list-jobs --region ap-southeast-1
 aws glue list-crawlers --region ap-southeast-1
 
 # Athena workgroup
-aws athena get-work-group --work-group cdcu-pre-prod-workgroup --region ap-southeast-1 --query "WorkGroup.State"
+aws athena get-work-group --work-group cdcu-sit-workgroup --region ap-southeast-1 --query "WorkGroup.State"
 
 # SageMaker domain
-aws sagemaker list-domains --region ap-southeast-1 --query "Domains[?DomainName=='cdcu-pre-prod-studio']"
+aws sagemaker list-domains --region ap-southeast-1 --query "Domains[?DomainName=='cdcu-sit-studio']"
 
 # IAM roles
 aws iam list-roles --query "Roles[?starts_with(RoleName, 'ST-CDCU')].RoleName"

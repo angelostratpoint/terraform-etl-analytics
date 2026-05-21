@@ -15,7 +15,6 @@ BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform 
 The May 2026 BPI-MS review confirmed the target operating model below:
 
 - Target environments are formally separated as `sit/`, `uat/`, and `prod/`.
-- `pre-prod/` remains temporarily as a legacy/sandbox root and should not be used for new BPI-MS deployments.
 - BPI-MS will review/approve IAM policy resources by group: Cloud Engineering, Data Engineering, and QA.
 - VPC, subnet, security group, and RDS/MySQL configuration review is read-only from this repository. BPI-MS owns those resources.
 - Terraform should provision CDCU Secrets Manager secret containers using the approved names, but must not store or commit secret values.
@@ -64,8 +63,7 @@ terraform-etl-analytics/
 |-- environments/
 |   |-- sit/                    # System Integration Testing root module
 |   |-- uat/                    # User Acceptance Testing root module
-|   |-- prod/                   # Production root module
-|   `-- pre-prod/               # Legacy/sandbox root retained temporarily
+|   `-- prod/                   # Production root module
 |-- modules/
 |   |-- artifacts/              # Uploads artifacts/* files to S3
 |   |-- athena/

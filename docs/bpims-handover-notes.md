@@ -1,16 +1,19 @@
-# CDCU Terraform IAM Scripts - Ready for BPI MS Review
+# CDCU Terraform Infrastructure Handover Notes - Ready for BPI MS Review
 
 **Prepared by:** Stratpoint Cloud Engineering
 **For:** BPI MS Cloud Engineering Team
-**Branch:** `codex-client-governed-service-scope`
-**Date:** 2026-05-15
 
 ---
 
 ## What Stratpoint Has Prepared
 
-The Terraform scripts in this branch are ready for BPI MS review and execution. They use
-the `ST-CDCU` naming prefix for the additional IAM roles and groups requested by BPI MS.
+The Terraform scripts in this branch are ready for BPI MS review and controlled SIT
+validation. They use the `ST-CDCU` naming prefix for the additional IAM roles and
+groups requested by BPI MS.
+
+Final UAT and production execution should proceed only after BPI MS confirms the
+approved naming convention, backend resources, deployment role model, network inputs,
+Lake Formation approach, and QuickSight access model.
 
 | Resource Type | Name |
 |---|---|
@@ -52,6 +55,7 @@ Terraform does not create or modify the following BPI MS baseline resources:
 | Secret values for MySQL connections | BPI MS |
 | Existing `cdcu-*` user roles and policies | BPI MS |
 | GitHub OIDC role creation | BPI MS |
+| Terraform remote state S3 bucket and DynamoDB lock table | BPI MS / bootstrap process |
 | Lake Formation account governance and data lake admin settings | BPI MS |
 | CodePipeline / CI-CD enterprise access | BPI MS, later phase |
 
@@ -84,8 +88,10 @@ testing only — it must not be used in production.
 
 ### Option A — IAM Role Setup (Recommended)
 
-This is a one-time setup. BPI MS IT creates the role once and provides Stratpoint
-with the ARN.
+This setup is required before BPI MS executes Terraform. BPI MS IT may create one
+deployment role per environment or one approved cross-environment deployment role,
+depending on the final governance model. The role ARN must be provided in
+`terraform.tfvars`.
 
 #### Step 1 — Create the Deployment Role
 
@@ -95,29 +101,31 @@ with the ARN.
 |---|---|
 | Trusted entity type | `AWS account` |
 | Account ID | BPI MS AWS account ID |
-| Role name | `cdcu-sit-terraform-deployment-role` |
-| Description | `Terraform deployment role for CDCU sit infrastructure` |
+| Role name | `cdcu-{env}-terraform-deployment-role` or BPI-MS approved name |
+| Description | `Terraform deployment role for CDCU {env} infrastructure` |
 
 **Tags:**
 
 | Key | Value |
 |---|---|
 | Project | CDCU |
-| Environment | sit |
+| Environment | `{env}` |
 | ManagedBy | Manual |
 | Owner | BPI MS |
 
 #### Step 2 — Attach Permissions
 
-Attach these AWS managed policies to the role:
+For initial review and sandbox validation, the following AWS managed policies describe
+the broad access needed to provision the CDCU service layer:
 
 | Policy | Why Needed |
 |---|---|
 | `PowerUserAccess` | Covers S3, Glue, SageMaker, Athena, QuickSight, EC2, CloudWatch provisioning |
 | `IAMFullAccess` | Required to create ST-CDCU roles, groups, and policies |
 
-> If BPI MS security team cannot approve `IAMFullAccess`, a custom scoped IAM policy
-> can be created. Contact Stratpoint Cloud Engineering for the exact policy document.
+> BPI MS may replace these with a custom scoped deployment policy. The deployment
+> policy must still be able to create and update the CDCU service resources and
+> additional `ST-CDCU` IAM roles, groups, policies, and attachments.
 
 #### Step 3 — Add Trust Policy
 
@@ -149,10 +157,20 @@ Replace `<account-id>` and `<operator-user-or-role>` with actual values:
 
 #### Step 4 - Provider Behavior
 
-The committed Terraform provider configuration uses `assume_role` so all environment
-roots follow the same deployment pattern. Do not commit an IAM-user-only provider
-override. If a temporary IAM user is required for sandbox testing, handle it as a local
-uncommitted workaround only and migrate back to Option A before SIT/UAT/prod execution.
+The Terraform roots are designed to be run by an approved BPI-MS deployment identity.
+For production, the committed `prod` root already uses `assume_role` with
+`terraform_role_arn`.
+
+The `sit` and `uat` roots currently allow active AWS CLI profile execution for sandbox
+validation, with comments showing the `assume_role` block to restore for BPI-MS
+execution. Before BPI-MS controlled SIT/UAT execution, either:
+
+1. Restore the `assume_role` block in `environments/sit/providers.tf` and
+   `environments/uat/providers.tf`, or
+2. Run Terraform from an already-assumed approved deployment role session.
+
+Do not commit personal IAM user credentials, access keys, or IAM-user-only provider
+overrides.
 
 ---
 
@@ -168,9 +186,9 @@ Please fill these values in each environment's `terraform.tfvars` before running
 | `subnet_id` | BPI MS network baseline | Always |
 | `subnet_ids` | BPI MS network baseline | Always |
 | `existing_security_group_id` | BPI MS security baseline | Always |
-| `existing_kms_key_arn` | BPI MS KMS baseline | Prod only when `enable_kms = true` |
+| `existing_kms_key_arn` | BPI MS KMS baseline | Required when `enable_kms = true` |
 | `existing_quicksight_access_role_arn` | BPI MS QuickSight setup | Optional reference |
-| `terraform_lock_table_name` | DynamoDB lock table name | Must match backend table: `cdcu-terraform-locks-sit` or `cdcu-terraform-locks-prod` |
+| `terraform_lock_table_name` | DynamoDB lock table name | Must match backend table: `cdcu-terraform-locks-sit`, `cdcu-terraform-locks-uat`, or `cdcu-terraform-locks-prod` |
 
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are
 deprecated compatibility inputs. The active environment roots use the ST-CDCU roles
@@ -235,9 +253,11 @@ for these names. Terraform must not store secret values, passwords, or rotation 
 in `terraform.tfvars`, committed files, or Terraform state. BPI-MS / authorized
 operators should populate and rotate secret values through a secure approved process.
 
-Current implementation note: the current `modules/glue/` code references existing
-secrets by name. A later implementation phase should add an optional Secrets Manager
-container module that creates the secret containers only, without `secret_string`.
+Current implementation note: the current `modules/glue/` code references secrets by
+name, so the secret containers must exist before `terraform plan` / `terraform apply`
+unless Phase 2B is implemented first. A later implementation phase should add an
+optional Secrets Manager container module that creates the secret containers only,
+without `secret_string`.
 
 If the existing BPI MS deny policy blocks `secretsmanager:*` for all CDCU roles, BPI MS
 must allow the approved read-only actions for the ST-CDCU runtime roles on `cdcu/*`
@@ -329,7 +349,46 @@ gates, and environment promotion model.
 
 ---
 
+## Pending BPI-MS Naming Convention
+
+BPI-MS will provide the final naming convention for CDCU AWS resources. Until that is
+received, do not implement new Terraform resource-naming changes or the Secrets Manager
+container module. The current `sit`, `uat`, and `prod` environment roots are ready for
+review, but naming-sensitive changes should wait for BPI-MS confirmation.
+
+Use this intake table when the naming convention is provided:
+
+| Resource area | Current Terraform pattern | BPI-MS naming convention | Action needed |
+|---|---|---|---|
+| S3 data lake bucket | `cdcu-{env}-data-lake` | Pending | Confirm or update module naming |
+| Athena results bucket | `cdcu-{env}-athena-results` | Pending | Confirm or update module naming |
+| Secrets Manager paths | `cdcu/{env}/microsite-mysql-connection`, `cdcu/{env}/legacy-mysql-connection` | Pending | Confirm before Phase 2B |
+| IAM roles | `ST-CDCU-{env}-GlueExecutionRole`, `ST-CDCU-{env}-SageMakerExecutionRole`, `ST-CDCU-{env}-AthenaQueryRole` | Pending | Confirm role names and trust scope |
+| IAM groups | `ST-CDCU-{env}-CloudEngineering`, `ST-CDCU-{env}-DataEngineering`, `ST-CDCU-{env}-QA` | Pending | Confirm CE/DE/QA group names |
+| IAM policies | `ST-CDCU-{env}-<PolicyName>` | Pending | Confirm policy naming and attachment model |
+| Glue catalog database | `cdcu_{env}_catalog` | Pending | Confirm Athena-safe database naming |
+| Glue jobs/crawlers/connections | `cdcu-{env}-...` | Pending | Confirm service object naming |
+| Athena workgroup | `cdcu-{env}-workgroup` | Pending | Confirm workgroup naming |
+| SageMaker Studio domain/spaces | `cdcu-{env}-studio`, `cdcu-{env}-<profile>-jupyterlab` | Pending | Confirm Studio naming |
+| QuickSight groups/assets | `cdcu-{env}-...` | Pending | Confirm QuickSight namespace/group/data source naming |
+| Terraform backend bucket | `cdcu-terraform-state-{env}` | Pending | Confirm backend naming before `terraform init` |
+| Terraform lock table | `cdcu-terraform-locks-{env}` | Pending | Confirm lock table naming before `terraform init` |
+
+Recommended order after BPI-MS provides the naming convention:
+
+1. Map each naming rule against the table above.
+2. Decide whether each pattern remains hardcoded, becomes a variable, or is generated through a shared naming local.
+3. Update Terraform modules only for confirmed naming changes.
+4. Implement the Secrets Manager container module for approved names only.
+5. Re-run `terraform fmt -recursive` and validate `sit`, `uat`, and `prod`.
+
+---
+
 ## Deployment Steps
+
+For syntax-only validation before backend resources exist, use
+`terraform init -backend=false`. For real deployment, the backend S3 bucket and
+DynamoDB lock table must exist first.
 
 ```powershell
 cd environments/sit
@@ -344,6 +403,8 @@ terraform apply tfplan
 ```
 
 UAT and production use the same flow from `environments/uat` and `environments/prod`.
+Replace `sit` with `uat` or `prod` in commands and expected resource names when
+validating those environments.
 
 ---
 
@@ -369,15 +430,16 @@ aws athena get-work-group --work-group cdcu-sit-workgroup --region ap-southeast-
 
 | Step | Action | Owner |
 |---|---|---|
-| 1 | Review and approve Terraform scripts | BPI MS |
-| 2 | Set up Terraform deployment role. IAM user access is sandbox-only if temporarily required | BPI MS IT |
-| 3 | Confirm network prerequisites — VPC, subnet, SG, VPC endpoints | BPI MS |
-| 4 | Review Secrets Manager container creation and read-only runtime exception requirement | BPI MS |
-| 5 | Fill `terraform.tfvars` with environment values | BPI MS |
-| 6 | Run `terraform apply` on SIT | BPI MS Cloud Engineer |
-| 7 | Verify post-deployment checklist | Both teams |
-| 8 | Grant CE access to Stratpoint after scripts are reviewed and approved | BPI MS |
-| 9 | Migrate from IAM user to IAM role before UAT/prod if Option B was used temporarily | BPI MS IT |
-| 10 | Run `terraform apply` on UAT and prod after sign-off | BPI MS Cloud Engineer |
-| 12 | Add Secrets Manager container module if approved | Stratpoint / BPI-MS review |
+| 1 | Review Terraform scripts and confirm BPI-MS naming convention | BPI MS |
+| 2 | Bootstrap or confirm backend S3 bucket and DynamoDB lock table per environment | BPI MS |
+| 3 | Set up Terraform deployment role. IAM user access is sandbox-only if temporarily required | BPI MS IT |
+| 4 | Confirm network prerequisites - VPC, subnet, SG, VPC endpoints | BPI MS |
+| 5 | Review Secrets Manager container creation and read-only runtime exception requirement | BPI MS |
+| 6 | Fill `terraform.tfvars` with environment values | BPI MS |
+| 7 | Run `terraform apply` on SIT | BPI MS Cloud Engineer |
+| 8 | Verify post-deployment checklist | Both teams |
+| 9 | Grant CE access to Stratpoint after scripts are reviewed and approved | BPI MS |
+| 10 | Migrate from IAM user to IAM role before UAT/prod if Option B was used temporarily | BPI MS IT |
+| 11 | Run `terraform apply` on UAT and prod after sign-off | BPI MS Cloud Engineer |
+| 12 | Add Secrets Manager container module after naming approval, if approved | Stratpoint / BPI-MS review |
 | 13 | Add CDCU-scoped Lake Formation grants if enabled | Stratpoint / BPI-MS review |

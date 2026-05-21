@@ -16,7 +16,8 @@ BPI MS will review, approve, and execute the Terraform scripts. Stratpoint provi
 |---|---|
 | Resource naming prefix | `ST-CDCU` |
 | Target region | `ap-southeast-1` |
-| Environments | `pre-prod`, `prod` |
+| Active BPI-MS Terraform environments | `sit`, `uat`, `prod` |
+| Legacy/sandbox environment | `pre-prod` |
 | Terraform module path | `modules/iam/` |
 | Executed by | BPI MS Cloud Engineer |
 | Prepared by | Stratpoint Cloud Engineering |
@@ -36,6 +37,46 @@ as input variables only — it does not create or modify them.
 | KMS Key (prod) | `existing_kms_key_arn` |
 | Secrets Manager secrets | `cdcu/{env}/microsite-mysql-connection`, `cdcu/{env}/legacy-mysql-connection` |
 | Terraform deployment role | `terraform_role_arn` |
+
+---
+
+## Latest BPI-MS Governance Notes
+
+The repository now includes the approved SIT/UAT/Prod environment roots. The legacy
+`pre-prod` root remains temporarily for sandbox/reference use and should not be used for
+new BPI-MS deployments.
+
+BPI-MS will provide/review the required IAM policy resources per group:
+
+| Group | Review focus |
+|---|---|
+| Cloud Engineering | Deployment orchestration, Terraform state access, service-layer provisioning, and approved CodePipeline access later |
+| Data Engineering | Glue/SageMaker scripts, data lake object access, Athena querying, and read-only secrets use |
+| QA | Read-only validation access through Athena results and CloudWatch logs |
+
+VPC, subnet, security group, RDS/MySQL source access, and enterprise networking remain
+BPI-MS owned. Terraform may reference these values through variables only. Stratpoint may
+provide security group/subnet recommendations to BPI-MS, but should not manage the
+enterprise network baseline in this repository.
+
+Secrets Manager container creation is approved for the following names:
+
+```text
+cdcu/{env}/microsite-mysql-connection
+cdcu/{env}/legacy-mysql-connection
+```
+
+The future Terraform implementation should create only the secret containers and metadata
+when BPI-MS approves that task. Secret values, rotation credentials, passwords, and RDS
+connection material remain BPI-MS owned and must not be committed or stored in Terraform
+state.
+
+Lake Formation is expected in BPI-MS accounts. The current IAM module does not create Lake
+Formation resources or grants. A future CDCU-scoped Lake Formation phase should grant
+database/table permissions to Glue, Athena, and QuickSight principals after BPI-MS confirms
+the account data lake admin and governance model.
+
+CodePipeline is later scope and is not required for current Phase 1 provisioning.
 
 ---
 
@@ -193,11 +234,18 @@ modules/iam/
 └── outputs.tf     # role ARNs, group names
 ```
 
-The module is wired into both environment roots:
+The module is wired into the approved environment roots:
 
 ```text
-environments/pre-prod/main.tf  →  module "iam" { source = "../../modules/iam" }
+environments/sit/main.tf       →  module "iam" { source = "../../modules/iam" }
+environments/uat/main.tf       →  module "iam" { source = "../../modules/iam" }
 environments/prod/main.tf      →  module "iam" { source = "../../modules/iam" }
+```
+
+The legacy sandbox root remains temporarily:
+
+```text
+environments/pre-prod/main.tf  ->  module "iam" { source = "../../modules/iam" }
 ```
 
 Once the IAM module runs, `module.iam.glue_execution_role_arn` and
@@ -220,6 +268,13 @@ that were previously filled manually in `terraform.tfvars`.
 ---
 
 ## Pre-Deployment Checklist for BPI MS
+
+Additional checklist items from the latest BPI-MS meeting:
+
+- [ ] Confirm when the legacy `pre-prod` root can be retired after state/migration review
+- [ ] Confirm Terraform should create only the approved Secrets Manager containers and never create secret values
+- [ ] Confirm Lake Formation admins and CDCU database/table grants for Glue, Athena, and QuickSight principals
+- [ ] Confirm CodePipeline access is later scope and not required for Phase 1
 
 Before running `terraform apply` on the IAM module:
 

@@ -1,7 +1,7 @@
 variable "environment" {
   description = "Deployment environment"
   type        = string
-  default     = "prod"
+  default     = "uat"
 
   validation {
     condition     = contains(["sit", "uat", "prod"], var.environment)
@@ -60,7 +60,7 @@ variable "github_repo" {
 variable "enable_kms" {
   description = "Whether to enable KMS encryption"
   type        = bool
-  default     = true
+  default     = false
 }
 
 # Reserved for future use — CloudWatch alarms pending BPI MS approval. Not currently passed to any module.
@@ -73,7 +73,7 @@ variable "sns_topic_arn" {
 variable "glue_worker_count" {
   description = "Number of Glue workers"
   type        = number
-  default     = 10
+  default     = 2
 }
 
 variable "glue_worker_type" {
@@ -116,7 +116,7 @@ variable "enable_sagemaker_unified_studio" {
 variable "sagemaker_studio_user_profile_names" {
   description = "SageMaker Studio user profile names to create"
   type        = list(string)
-  default     = ["data-scientist-01", "data-scientist-02"]
+  default     = ["data-engineer-01"]
 }
 
 variable "sagemaker_studio_space_instance_type" {
@@ -167,7 +167,7 @@ variable "quicksight_spice_capacity_gb" {
 variable "terraform_lock_table_name" {
   description = "Name of the DynamoDB table used for Terraform state locking; must match the backend DynamoDB table unless BPI MS approves a separate IAM table."
   type        = string
-  default     = "cdcu-terraform-locks-prod"
+  default     = "cdcu-terraform-locks-uat"
 }
 
 variable "manage_iam" {

@@ -1,7 +1,9 @@
 # CDCU Sandbox Setup Guide
 
-This guide covers everything needed to provision the CDCU pre-prod infrastructure
-on a fresh Stratpoint sandbox AWS account before final testing and BPI MS handover.
+This guide captures the original CDCU pre-prod sandbox setup flow used during early
+testing. After the SIT/UAT/Prod environment split, use `environments/sit` for new
+sandbox-style validation unless you are intentionally reproducing the older pre-prod
+test path.
 
 ---
 

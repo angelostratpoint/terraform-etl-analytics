@@ -1,5 +1,9 @@
 # CDCU Stratpoint Sandbox — Daily Network Setup Guide
 
+> Note: This guide records the earlier Stratpoint pre-prod sandbox setup. After the
+> SIT/UAT/Prod environment split, use environments/sit for new sandbox-style
+> validation unless you are intentionally reproducing the older test path.
+
 This guide covers the manual AWS setup required each time the Stratpoint sandbox
 account resets. These are temporary placeholder resources that simulate the BPI MS
 baseline network environment. They are NOT managed by Terraform.
@@ -38,8 +42,8 @@ Expected output:
 ```json
 {
     "UserId": "AIDAXXXXXXXXXXXXXXXXX",
-    "Account": "024415233264",
-    "Arn": "arn:aws:iam::024415233264:user/stratpoint-gelo"
+    "Account": "<sandbox-account-id>",
+    "Arn": "arn:aws:iam::<sandbox-account-id>:user/<sandbox-iam-user>"
 }
 ```
 
@@ -210,14 +214,14 @@ endpoints (require the SG from Step 4).
 
 > **Important:** S3 bucket names are globally unique across all AWS accounts.
 > Always append your AWS account ID to avoid `BucketAlreadyExists` errors.
-> The Stratpoint sandbox account ID is `024415233264`.
+> The Stratpoint sandbox account ID is `<sandbox-account-id>`.
 
 Run in PowerShell:
 
 ```powershell
 # Create S3 state bucket with account ID suffix
 aws s3api create-bucket `
-  --bucket cdcu-terraform-state-pre-prod-024415233264 `
+  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
   --region ap-southeast-1 `
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 ```
@@ -225,22 +229,22 @@ aws s3api create-bucket `
 Expected output:
 ```json
 {
-    "Location": "http://cdcu-terraform-state-pre-prod-024415233264.s3.amazonaws.com/",
-    "BucketArn": "arn:aws:s3:::cdcu-terraform-state-pre-prod-024415233264"
+    "Location": "http://cdcu-terraform-state-pre-prod-<sandbox-account-id>.s3.amazonaws.com/",
+    "BucketArn": "arn:aws:s3:::cdcu-terraform-state-pre-prod-<sandbox-account-id>"
 }
 ```
 
 ```powershell
 # Enable versioning
 aws s3api put-bucket-versioning `
-  --bucket cdcu-terraform-state-pre-prod-024415233264 `
+  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
   --versioning-configuration Status=Enabled
 ```
 
 ```powershell
 # Block public access
 aws s3api put-public-access-block `
-  --bucket cdcu-terraform-state-pre-prod-024415233264 `
+  --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id> `
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
@@ -266,7 +270,7 @@ No output from the wait command = table is ACTIVE.
 
 Verify both exist:
 ```powershell
-aws s3api head-bucket --bucket cdcu-terraform-state-pre-prod-024415233264
+aws s3api head-bucket --bucket cdcu-terraform-state-pre-prod-<sandbox-account-id>
 
 aws dynamodb describe-table `
   --table-name cdcu-terraform-locks-pre-prod `
@@ -286,7 +290,7 @@ After creating the bucket with the account ID suffix, update
 ```hcl
 terraform {
   backend "s3" {
-    bucket         = "cdcu-terraform-state-pre-prod-024415233264"
+    bucket         = "cdcu-terraform-state-pre-prod-<sandbox-account-id>"
     key            = "cdcu/pre-prod/terraform.tfstate"
     region         = "ap-southeast-1"
     dynamodb_table = "cdcu-terraform-locks-pre-prod"
@@ -313,7 +317,7 @@ aws secretsmanager create-secret `
 Expected output:
 ```json
 {
-    "ARN": "arn:aws:secretsmanager:ap-southeast-1:024415233264:secret:cdcu/pre-prod/microsite-mysql-connection-HF0p8D",
+    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/pre-prod/microsite-mysql-connection-HF0p8D",
     "Name": "cdcu/pre-prod/microsite-mysql-connection",
     "VersionId": "dc8f0740-f02d-43c5-97f9-5e4142e6c534"
 }
@@ -330,7 +334,7 @@ aws secretsmanager create-secret `
 Expected output:
 ```json
 {
-    "ARN": "arn:aws:secretsmanager:ap-southeast-1:024415233264:secret:cdcu/pre-prod/legacy-mysql-connection-c4xfKz",
+    "ARN": "arn:aws:secretsmanager:ap-southeast-1:<sandbox-account-id>:secret:cdcu/pre-prod/legacy-mysql-connection-c4xfKz",
     "Name": "cdcu/pre-prod/legacy-mysql-connection",
     "VersionId": "ceb7436f-30e3-49f1-9e9b-a414dc4cb2b7"
 }
@@ -360,7 +364,7 @@ from Steps 2–4:
 
 ```hcl
 environment        = "pre-prod"
-terraform_role_arn = "arn:aws:iam::024415233264:role/<your-sandbox-deployment-role>"
+terraform_role_arn = "arn:aws:iam::<sandbox-account-id>:role/<your-sandbox-deployment-role>"
 
 vpc_id    = "<vpc-id from Step 2>"
 subnet_id = "<subnet-id from Step 3>"
@@ -459,7 +463,7 @@ aws iam list-roles `
 | VPC / Subnet / SG | Created manually each reset | Pre-provisioned by BPI MS |
 | Route table | VPC main route table (auto-created) | BPI MS managed |
 | VPC endpoints | Created manually each reset | Pre-provisioned by BPI MS |
-| S3 state bucket name | Suffixed with account ID (`-024415233264`) | BPI MS naming convention |
+| S3 state bucket name | Suffixed with account ID (`-<sandbox-account-id>`) | BPI MS naming convention |
 | Deployment role | Sandbox admin role | BPI MS approved deployment role |
 | RDS / MySQL | Placeholder JDBC URLs | Real RDS endpoints |
 | Secrets Manager values | Placeholder credentials | Real credentials by BPI MS |
@@ -491,7 +495,7 @@ Run `terraform destroy` when done with the sandbox session to avoid charges.
 - [ ] Secrets Manager Interface endpoint created and Available
 - [ ] Glue Interface endpoint created and Available
 - [ ] CloudWatch Logs Interface endpoint created and Available
-- [ ] S3 state bucket `cdcu-terraform-state-pre-prod-024415233264` exists
+- [ ] S3 state bucket `cdcu-terraform-state-pre-prod-<sandbox-account-id>` exists
 - [ ] DynamoDB lock table `cdcu-terraform-locks-pre-prod` exists and is ACTIVE
 - [ ] `environments/pre-prod/backend.tf` bucket name matches the S3 state bucket
 - [ ] Both Secrets Manager secrets exist (`cdcu/pre-prod/microsite-mysql-connection` and `cdcu/pre-prod/legacy-mysql-connection`)

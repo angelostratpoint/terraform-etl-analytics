@@ -30,8 +30,12 @@ jobs:
           COMMIT_MSG="${{ github.event.head_commit.message }}"
           if echo "$COMMIT_MSG" | grep -q '\[env:prod\]'; then
             echo "environment=prod" >> $GITHUB_OUTPUT
+          elif echo "$COMMIT_MSG" | grep -q '\[env:uat\]'; then
+            echo "environment=uat" >> $GITHUB_OUTPUT
+          elif echo "$COMMIT_MSG" | grep -q '\[env:sit\]'; then
+            echo "environment=sit" >> $GITHUB_OUTPUT
           else
-            echo "environment=pre-prod" >> $GITHUB_OUTPUT
+            echo "environment=sit" >> $GITHUB_OUTPUT
           fi
 
   terraform-apply:

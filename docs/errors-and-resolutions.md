@@ -1068,7 +1068,7 @@ SELECT * FROM "cdcu_pre_prod_catalog"."matching" LIMIT 10
 ## Error 24: QuickSight / IAM Alignment Review - AthenaQueryRole and Permission Wiring
 
 **Context:** Review of the BPI-MS IAM policy alignment found several QuickSight and IAM
-items that are important before enabling QuickSight in BPI-MS pre-prod/prod.
+items that are important before enabling QuickSight in BPI-MS SIT/UAT/Prod.
 
 **Observed gaps:**
 
@@ -1159,7 +1159,7 @@ created and output for review, but it is not currently consumed by the QuickSigh
 > For BPI MS environment: Treat QuickSight, scoped PassRole, Amazon Q user assignment,
 > and S3 bucket versioning administration as explicit review/approval topics. The
 > Stratpoint sandbox should be used to prove the QuickSight access model before enabling
-> QuickSight in BPI-MS pre-prod/prod.
+> QuickSight in BPI-MS SIT/UAT/Prod.
 
 ---
 
@@ -1292,7 +1292,7 @@ Query Id: 04866ec3-59c5-478d-8298-259ae1a935d0
 
 **Cause:** Even after the Glue crawlers succeeded (Error 25 fix) and tables were
 registered in the Glue catalog, Athena queries failed because Lake Formation had not
-granted column-level access to the querying IAM user (`stratpoint-gelo`). Lake Formation
+granted column-level access to the querying IAM user (`<sandbox-iam-user>`). Lake Formation
 enforces permissions at the column level — without an explicit `SELECT` grant on the
 table columns, Athena can see the table exists but cannot read any columns from it.
 

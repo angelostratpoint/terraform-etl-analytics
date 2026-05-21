@@ -1,6 +1,18 @@
 # CDCU Terraform Deployment Guide
 
-This workspace provisions the CDCU application service layer plus the additional `ST-CDCU` IAM roles and groups requested for the project. BPI MS / Stratpoint manually prepares the account baseline, deployment role, security baseline, VPC/subnets, security groups, KMS, source database access, and approved Secrets Manager secret containers before Terraform runs.
+This workspace provisions the CDCU application service layer plus the additional `ST-CDCU` IAM roles and groups requested for the project. BPI MS / Stratpoint manually prepares the account baseline, deployment role, security baseline, VPC/subnets, security groups, KMS, and source database access before Terraform runs.
+
+## Confirmed BPI-MS Deployment Direction
+
+The latest BPI-MS review confirmed these alignment decisions:
+
+- Target AWS environment separation is now represented by `environments/sit`, `environments/uat`, and `environments/prod`.
+- `environments/pre-prod` remains temporarily as a legacy/sandbox root and should not be used for new BPI-MS deployments.
+- BPI-MS will provide/review IAM policy resources by human group: Cloud Engineering, Data Engineering, and QA.
+- VPC configuration is read-only for this repository. Security group, subnet, and route suggestions may be documented for BPI-MS, but Terraform does not own enterprise networking.
+- Terraform should provision CDCU Secrets Manager secret containers for Microsite and Legacy, but must not provision secret values.
+- Lake Formation is required when BPI-MS enables it; CDCU-scoped Lake Formation grants should be implemented as a separate Terraform phase.
+- CodePipeline is later scope and is not required for the current Phase 1 deployment.
 
 ## Prerequisites
 
@@ -14,7 +26,7 @@ Before deploying, confirm the following are in place:
 - [ ] BPI MS provided VPC ID, subnet ID, security group ID, and availability zone
 - [ ] Glue subnet has S3 access through an S3 Gateway VPC endpoint or NAT route
 - [ ] Existing KMS key ARN provided when `enable_kms = true`
-- [ ] Required Secrets Manager secrets already created
+- [ ] Required Secrets Manager secret containers exist, or the approved Secrets Manager container module has been enabled
 - [ ] Real RDS JDBC URLs provided for Microsite and Legacy MySQL sources
 - [ ] QuickSight is enabled in `ap-southeast-1` when `enable_quicksight = true`
 - [ ] BPI MS has approved the additional `ST-CDCU` IAM roles, groups, and policies
@@ -53,7 +65,8 @@ The backend configuration uses these remote state lock tables:
 
 | Environment | Backend lock table |
 |---|---|
-| `pre-prod` | `cdcu-terraform-locks-pre-prod` |
+| `sit` | `cdcu-terraform-locks-sit` |
+| `uat` | `cdcu-terraform-locks-uat` |
 | `prod` | `cdcu-terraform-locks-prod` |
 
 Set `terraform_lock_table_name` to the same environment-specific table unless BPI MS provides a different approved lock table name for the IAM policy.
@@ -62,14 +75,14 @@ Terraform checks the required external IDs before provisioning CDCU services. Gl
 
 ## Required Secrets
 
-Glue connections reference these existing Secrets Manager secret names:
+Glue connections use these approved Secrets Manager secret names:
 
 ```text
 cdcu/{environment}/microsite-mysql-connection
 cdcu/{environment}/legacy-mysql-connection
 ```
 
-Terraform does not create secret values and does not read `secret_string`, so database credentials are not stored in Terraform state. BPI MS / authorized operators should create and populate these secrets outside Terraform.
+Current Terraform references these secret names. The next approved alignment phase should allow Terraform to create the secret containers only. Terraform must not create `aws_secretsmanager_secret_version` resources containing passwords and must not store `secret_string` values in state. BPI MS / authorized operators should populate and rotate the secret values outside Terraform or through a BPI-approved rotation mechanism.
 
 Glue connections also require non-local JDBC URLs in `terraform.tfvars`:
 
@@ -79,6 +92,21 @@ legacy_jdbc_url    = "jdbc:mysql://<bpi-legacy-rds-endpoint>:3306/<database>"
 ```
 
 The variables reject `localhost` values so test placeholders are not accidentally deployed to BPI MS environments.
+
+## Lake Formation
+
+Lake Formation is not currently provisioned by this Terraform workspace. The Stratpoint sandbox proved that IAM alone is not sufficient when Lake Formation is enabled: Glue crawlers, Athena users, and QuickSight principals all require explicit Lake Formation grants.
+
+When BPI-MS enables Lake Formation, add a CDCU-scoped Lake Formation phase before production use. The future Terraform scope should include only workload grants, not account-wide Lake Formation governance:
+
+| Principal | Minimum CDCU grants to review |
+|---|---|
+| `ST-CDCU-{env}-GlueExecutionRole` | Database/table permissions needed by Glue crawlers and jobs |
+| Athena/Query role or approved Athena users | Database `DESCRIBE`, table `DESCRIBE`, and column/table `SELECT` |
+| QuickSight service role | Database `DESCRIBE`, table `DESCRIBE`, and column/table `SELECT` |
+| QuickSight author user/group | Database `DESCRIBE`, table `DESCRIBE`, and column/table `SELECT` |
+
+BPI-MS remains owner of Lake Formation admin settings, data lake administrators, cross-account settings, and any enterprise data governance standards.
 
 ## QuickSight
 
@@ -108,7 +136,7 @@ Keep this automation as a separate approval item because it introduces a new ser
 ## Deployment
 
 ```bash
-cd environments/pre-prod
+cd environments/sit
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with BPI MS provided values
 
@@ -119,7 +147,7 @@ terraform plan -var-file="terraform.tfvars" -out=tfplan
 terraform apply tfplan
 ```
 
-For production, run the same flow from `environments/prod`.
+For UAT and production, run the same flow from `environments/uat` and `environments/prod`.
 
 Run Terraform from the environment folder only. Running `terraform init`, `validate`, or `plan` from the repository root will not validate this project because the root folder is not a Terraform root module.
 
@@ -128,20 +156,20 @@ Run Terraform from the environment folder only. Running `terraform init`, `valid
 ```bash
 terraform output
 
-aws s3 ls s3://cdcu-pre-prod-data-lake --profile cdcu-pre-prod-profile
+aws s3 ls s3://cdcu-sit-data-lake --profile cdcu-sit-profile
 
 aws glue get-database \
-  --name cdcu_pre_prod_catalog \
+  --name cdcu_sit_catalog \
   --region ap-southeast-1 \
-  --profile cdcu-pre-prod-profile
+  --profile cdcu-sit-profile
 
 aws athena get-work-group \
-  --work-group cdcu-pre-prod-workgroup \
+  --work-group cdcu-sit-workgroup \
   --region ap-southeast-1 \
-  --profile cdcu-pre-prod-profile
+  --profile cdcu-sit-profile
 
-aws s3 ls s3://cdcu-pre-prod-data-lake/pre-prod/glue-scripts/ \
-  --profile cdcu-pre-prod-profile
+aws s3 ls s3://cdcu-sit-data-lake/sit/glue-scripts/ \
+  --profile cdcu-sit-profile
 ```
 
 ## DE Script Uploads
@@ -188,7 +216,7 @@ Step-by-step for a fresh clone:
 # 1. Clone and switch to the working branch
 git clone https://github.com/angelostratpoint/terraform-etl-analytics.git
 cd terraform-etl-analytics
-git checkout codex-client-governed-service-scope-v2
+git checkout codex-client-governed-service-scope-v3
 
 # 2. Authenticate to AWS
 aws sso login --profile your-profile
@@ -196,7 +224,7 @@ aws sso login --profile your-profile
 aws configure
 
 # 3. Create terraform.tfvars from the example
-cd environments/pre-prod
+cd environments/sit
 copy terraform.tfvars.example terraform.tfvars
 # Fill in all real values — VPC, subnet, SG, role ARN, JDBC URLs
 
@@ -208,13 +236,13 @@ terraform validate
 terraform plan -var-file="terraform.tfvars" -out=tfplan
 ```
 
-> Note: Since resources are already provisioned in AWS, `terraform apply` on a fresh clone will not recreate anything. Terraform reads the remote state from S3 (`cdcu-terraform-state-pre-prod`) and confirms existing resources match the configuration. Any machine with the correct `terraform.tfvars` and AWS credentials can manage the same infrastructure.
+> Note: Since resources are tracked in remote state, `terraform apply` on a fresh clone will not recreate anything when the backend points to the correct environment state bucket, such as `cdcu-terraform-state-sit`, `cdcu-terraform-state-uat`, or `cdcu-terraform-state-prod`. Any machine with the correct `terraform.tfvars` and AWS credentials can manage the same infrastructure.
 
 ---
 
 ## Rollback
 
-Prefer reverting the Terraform change and applying a new plan. For emergency pre-prod cleanup only, targeted destroy can be used:
+Prefer reverting the Terraform change and applying a new plan. For emergency SIT/UAT cleanup only, targeted destroy can be used:
 
 ```bash
 terraform destroy -target=module.glue -var-file="terraform.tfvars"

@@ -12,6 +12,46 @@ BPI-MS remains the owner of enterprise IAM governance, AWS Identity Center, netw
 KMS governance, RDS/source database access, security baselines, and remote backend
 bootstrap resources.
 
+## Current Governance Decisions
+
+The latest BPI-MS direction is to use formal environment separation:
+
+```text
+sit/
+uat/
+prod/
+```
+
+Terraform now includes `environments/sit/`, `environments/uat/`, and
+`environments/prod/` roots for the approved BPI-MS environment model.
+`environments/pre-prod/` remains temporarily as a legacy/sandbox root and should not be
+used for new BPI-MS deployments. This document uses `{env}` to represent the approved
+environment name.
+
+BPI-MS will provide and review IAM policy resources by group, especially Cloud
+Engineering, Data Engineering, and QA. Terraform may create CDCU-scoped `ST-CDCU`
+groups/policies for those responsibilities, but it must not take ownership of enterprise
+IAM governance, AWS Identity Center, organization policy, or account-wide security
+controls.
+
+Secrets Manager secret containers are approved for these names:
+
+```text
+cdcu/{env}/microsite-mysql-connection
+cdcu/{env}/legacy-mysql-connection
+```
+
+A future Terraform update may create the secret containers only. Secret values,
+passwords, rotation credentials, and RDS connection material remain BPI-MS owned and must
+not be committed, stored in `terraform.tfvars`, or written through Terraform state.
+
+Lake Formation is expected in BPI-MS accounts. The current IAM implementation does not
+create Lake Formation permissions yet; those grants should be handled in a CDCU-scoped
+future phase after BPI-MS confirms data lake admin settings and the exact principals.
+
+CodePipeline / CI-CD access is later scope and is not required for the current Phase 1
+Terraform handover.
+
 ## Implemented IAM Groups
 
 | Group | Terraform name pattern | Attached policies |
@@ -47,6 +87,7 @@ arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
 | Athena | Terraform uses the `cdcu-{env}-workgroup` ARN and includes Athena results bucket access plus Glue Data Catalog metadata reads in the same managed policy. The access matrix may show these as separate rows for review clarity. |
 | CloudWatch Logs | Includes `/aws/glue/*`, `/aws-glue/*`, and `/aws/sagemaker/*` log groups plus log stream ARNs. Describe actions use `Resource = "*"` because AWS log discovery APIs commonly require it. |
 | Secrets Manager | Glue runtime gets `GetSecretValue` and `DescribeSecret`. Data Engineering gets `ListSecrets` on `*` plus read-only access scoped to `cdcu/{env}/*`. Terraform does not create, update, delete, or store secret values. |
+| Lake Formation | Not yet implemented in Terraform. If enabled by BPI-MS, CDCU-scoped grants are required for Glue, Athena, and QuickSight principals in addition to IAM. |
 | DynamoDB | Cloud Engineering gets state-lock access only to `terraform_lock_table_name`. Environment defaults match backend tables: `cdcu-terraform-locks-pre-prod` and `cdcu-terraform-locks-prod`. |
 | EventBridge | Cloud Engineering can manage only `rule/cdcu-*`; explicit deny blocks mutating non-CDCU rules. |
 | SageMaker | CDCU processing/training/model/endpoint/pipeline actions are scoped to `cdcu-*` SageMaker ARNs. Studio control-plane and list/tag actions remain on `*` where the SageMaker APIs do not cleanly support the same CDCU resource scoping. |
@@ -55,7 +96,7 @@ arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
 ## QuickSight Alignment Notes
 
 QuickSight is available in the Stratpoint sandbox and should be validated there before
-BPI-MS pre-prod/prod enablement.
+BPI-MS SIT/UAT/Prod enablement.
 
 Current Terraform creates QuickSight groups, an Athena data source, and a dataset when
 `enable_quicksight = true`. The module does not currently attach
@@ -92,3 +133,7 @@ For the Stratpoint sandbox test, use the same policy posture as BPI-MS where pos
 If a scoped policy fails during `terraform plan` or `terraform apply`, capture the exact
 AWS error and adjust only the failing statement. Keep PassRole and EventBridge automation
 separate until they are explicitly approved.
+
+For Lake Formation-enabled accounts, IAM permission alone is not enough. The sandbox
+QuickSight/Athena test already showed that missing Lake Formation `DESCRIBE`/`SELECT`
+grants can block table discovery even when IAM allows Athena and Glue read actions.

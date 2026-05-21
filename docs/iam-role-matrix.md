@@ -3,6 +3,20 @@
 This matrix summarizes the additional IAM resources created by `modules/iam/`.
 BPI MS existing `cdcu-*` roles remain outside Terraform scope and are not modified.
 
+## Environment Naming Note
+
+The approved BPI-MS Terraform roots are:
+
+```text
+environments/sit/
+environments/uat/
+environments/prod/
+```
+
+This matrix uses `{env}` generically so it can apply to `sit`, `uat`, and `prod`.
+The legacy `environments/pre-prod/` root remains temporarily for sandbox/reference use
+and should not be used for new BPI-MS deployments.
+
 ## Service Roles
 
 | Role Name | Trust Principal | Purpose |
@@ -33,6 +47,7 @@ BPI MS existing `cdcu-*` roles remain outside Terraform scope and are not modifi
 | EventBridge | Rule management scoped to `arn:aws:events:ap-southeast-1:{account}:rule/cdcu-*` |
 | DynamoDB | Terraform state lock access to the configured environment backend table, such as `cdcu-terraform-locks-pre-prod` or `cdcu-terraform-locks-prod` |
 | Amazon Q | Console assistant conversation actions only, with `sts:SetContext` and explicit denies for plugin/admin/code-generation actions. Policy exists but is not attached to groups. |
+| Lake Formation | Not currently provisioned by Terraform. If BPI-MS enables Lake Formation, CDCU-scoped database/table grants are required for Glue, Athena, and QuickSight principals. |
 
 ## Shared Deny Boundary
 
@@ -46,3 +61,8 @@ The ST-CDCU roles and groups receive a shared deny policy to protect the BPI MS 
 `iam:PassRole` is not included in the latest approved ST-CDCU policy list. If SageMaker
 job submission later requires a scoped PassRole exception, BPI MS should review and
 approve that separately.
+
+Lake Formation is a separate governance layer from IAM. The current IAM roles can still
+fail to discover or query Glue Catalog tables in Lake Formation-enabled accounts until
+BPI-MS grants the approved CDCU database/table permissions to the relevant service and
+human principals.

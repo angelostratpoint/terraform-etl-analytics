@@ -32,8 +32,10 @@ jobs:
           BRANCH="${{ github.head_ref }}"
           if [[ "$BRANCH" == feature/prod* ]] || [[ "$BRANCH" == hotfix/prod* ]]; then
             echo "environment=prod" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == feature/uat* ]] || [[ "$BRANCH" == hotfix/uat* ]]; then
+            echo "environment=uat" >> $GITHUB_OUTPUT
           else
-            echo "environment=pre-prod" >> $GITHUB_OUTPUT
+            echo "environment=sit" >> $GITHUB_OUTPUT
           fi
 
   terraform-plan:

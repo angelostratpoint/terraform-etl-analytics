@@ -21,7 +21,8 @@ the `ST-CDCU` naming prefix for the additional IAM roles and groups requested by
 | Data Engineering group | `ST-CDCU-{env}-DataEngineering` |
 | QA group | `ST-CDCU-{env}-QA` |
 
-`{env}` is either `pre-prod` or `prod`.
+`{env}` is `sit`, `uat`, or `prod` for new BPI-MS deployments. The legacy `pre-prod`
+root remains temporarily for sandbox/reference use only.
 
 ---
 
@@ -52,6 +53,8 @@ Terraform does not create or modify the following BPI MS baseline resources:
 | Secret values for MySQL connections | BPI MS |
 | Existing `cdcu-*` user roles and policies | BPI MS |
 | GitHub OIDC role creation | BPI MS |
+| Lake Formation account governance and data lake admin settings | BPI MS |
+| CodePipeline / CI-CD enterprise access | BPI MS, later phase |
 
 ---
 
@@ -145,83 +148,12 @@ Replace `<account-id>` and `<operator-user-or-role>` with actual values:
 > For GitHub Actions CI/CD, replace the `Principal` with the GitHub OIDC provider
 > ARN instead of an IAM user. Contact Stratpoint for the OIDC trust policy.
 
-#### Step 4 — Provide the Role ARN to Stratpoint
+#### Step 4 - Provider Behavior
 
-Once created, share the role ARN:
-
-```text
-arn:aws:iam::<bpims-account-id>:role/cdcu-pre-prod-terraform-deployment-role
-```
-
-Stratpoint will set this as `terraform_role_arn` in `terraform.tfvars` and
-`environments/pre-prod/providers.tf` will use it via `assume_role`.
-
----
-
-### Option B — IAM User (Pre-Prod Testing Only)
-
-If BPI MS IT cannot set up the IAM role before pre-prod testing begins, a dedicated
-IAM user can be used temporarily.
-
-> **Do not use this approach for production.**
-
-#### Step 1 — Create a Dedicated IAM User
-
-**AWS Console → IAM → Users → Create user**
-
-| Field | Value |
-|---|---|
-| Username | `cdcu-terraform-pre-prod` |
-| Access type | Programmatic access (access key only) |
-
-Attach these policies:
-
-| Policy | Why Needed |
-|---|---|
-| `PowerUserAccess` | Service provisioning |
-| `IAMFullAccess` | ST-CDCU role and group creation |
-
-#### Step 2 — Generate Access Keys
-
-**IAM → Users → `cdcu-terraform-pre-prod` → Security credentials → Create access key**
-
-Select use case: `Command Line Interface (CLI)`
-
-Provide the access key ID and secret access key to Stratpoint securely
-(not via email or chat).
-
-#### Step 3 — Stratpoint Configures AWS CLI
-
-```powershell
-aws configure --profile cdcu-pre-prod
-# Enter: Access Key ID, Secret Access Key, region ap-southeast-1
-```
-
-#### Step 4 — Update providers.tf for IAM User
-
-When using an IAM user directly, the `assume_role` block must be removed from
-`environments/pre-prod/providers.tf`:
-
-```hcl
-provider "aws" {
-  region = "ap-southeast-1"
-
-  # assume_role block removed for IAM user direct access
-  # Restore this block when migrating to IAM role
-
-  default_tags {
-    tags = {
-      Project     = "CDCU"
-      Environment = "pre-prod"
-      ManagedBy   = "Terraform"
-      Owner       = "Stratpoint"
-      CostCenter  = "CDCU-PRE-PROD"
-    }
-  }
-}
-```
-
-> Migrate to Option A (IAM role) before running `terraform apply` on production.
+The committed Terraform provider configuration uses `assume_role` so all environment
+roots follow the same deployment pattern. Do not commit an IAM-user-only provider
+override. If a temporary IAM user is required for sandbox testing, handle it as a local
+uncommitted workaround only and migrate back to Option A before SIT/UAT/prod execution.
 
 ---
 
@@ -244,6 +176,28 @@ Please fill these values in each environment's `terraform.tfvars` before running
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are
 deprecated compatibility inputs. The active environment roots use the ST-CDCU roles
 created by `modules/iam`.
+
+---
+
+## Environment Strategy Update
+
+BPI-MS confirmed that the preferred AWS environment approach is:
+
+```text
+SIT -> UAT -> Prod
+```
+
+Current repository state:
+
+```text
+environments/sit/
+environments/uat/
+environments/prod/
+environments/pre-prod/  # legacy/sandbox root retained temporarily
+```
+
+This separation is cleaner for approval gates, access control, testing evidence, and
+production readiness. Treat `pre-prod` as a temporary legacy/sandbox root only.
 
 ---
 
@@ -270,20 +224,49 @@ resources exist in the target AWS account:
 
 ## Secrets Manager Review Note
 
-Glue jobs read the MySQL JDBC credentials from these BPI MS-managed secrets:
+Glue jobs read the MySQL JDBC credentials from these approved CDCU Secrets Manager
+names:
 
 ```text
 cdcu/{environment}/microsite-mysql-connection
 cdcu/{environment}/legacy-mysql-connection
 ```
 
-Terraform grants `GetSecretValue` and `DescribeSecret` to the ST-CDCU Glue execution role.
-Terraform does not create, update, or store the secret values.
+The latest BPI-MS review confirmed that Terraform may provision the secret containers
+for these names. Terraform must not store secret values, passwords, or rotation material
+in `terraform.tfvars`, committed files, or Terraform state. BPI-MS / authorized
+operators should populate and rotate secret values through a secure approved process.
+
+Current implementation note: the current `modules/glue/` code references existing
+secrets by name. A later implementation phase should add an optional Secrets Manager
+container module that creates the secret containers only, without `secret_string`.
 
 If the existing BPI MS deny policy blocks `secretsmanager:*` for all CDCU roles, BPI MS
 must allow the approved read-only actions for the ST-CDCU runtime roles on `cdcu/*`
 secrets. Without that exception, Glue extraction jobs will not be able to connect to the
 RDS source databases.
+
+---
+
+## Lake Formation Review Note
+
+BPI-MS confirmed that Lake Formation is needed for the target account model. The current
+Terraform code does not yet provision Lake Formation grants. Lake Formation findings are
+documented from Stratpoint sandbox testing in `docs/errors-and-resolutions.md` Errors
+25, 26, and 27.
+
+Recommended next phase:
+
+- Add a CDCU-scoped `modules/lakeformation/` module.
+- Keep BPI-MS as owner of Lake Formation admin settings and enterprise governance.
+- Grant only CDCU database/table/column access required by:
+  - `ST-CDCU-{env}-GlueExecutionRole`
+  - approved Athena query principals
+  - QuickSight service role
+  - QuickSight author user/group principals
+- Keep Lake Formation grants environment-specific for `sit`, `uat`, and `prod`.
+
+IAM permissions alone are not enough when Lake Formation is enabled.
 
 ---
 
@@ -310,7 +293,7 @@ review, but the current `modules/quicksight/` implementation does not directly a
 that role to `aws_quicksight_data_source.athena`. QuickSight service access may be an
 account-level BPI-MS/QuickSight setting rather than a per-data-source role.
 
-Before enabling QuickSight in BPI-MS pre-prod/prod, validate the access model in the
+Before enabling QuickSight in BPI-MS SIT/UAT/Prod, validate the access model in the
 Stratpoint sandbox where QuickSight is already working:
 
 - QuickSight can query `cdcu-{env}-workgroup`
@@ -338,10 +321,20 @@ arn:aws:iam::<account-id>:policy/ST-CDCU-{env}-AmazonQDeveloperAccess
 
 ---
 
+## CodePipeline Review Note
+
+BPI-MS noted that CodePipeline access can be provided to Cloud Engineering later. This is
+not required for the current Phase 1 Terraform handover. Keep the current deployment
+path as BPI-MS/Cloud Engineering running Terraform from the environment root. Add
+CodePipeline only after BPI-MS approves the deployment role, repository source, approval
+gates, and environment promotion model.
+
+---
+
 ## Deployment Steps
 
 ```powershell
-cd environments/pre-prod
+cd environments/sit
 cp terraform.tfvars.example terraform.tfvars
 # Fill terraform.tfvars with BPI MS-provided values
 
@@ -352,24 +345,24 @@ terraform plan -var-file="terraform.tfvars" -out=tfplan
 terraform apply tfplan
 ```
 
-Production uses the same flow from `environments/prod` after pre-prod sign-off.
+UAT and production use the same flow from `environments/uat` and `environments/prod`.
 
 ---
 
 ## Post-Deployment Verification
 
 ```powershell
-aws iam get-role --role-name ST-CDCU-pre-prod-GlueExecutionRole
-aws iam get-role --role-name ST-CDCU-pre-prod-SageMakerExecutionRole
-aws iam get-role --role-name ST-CDCU-pre-prod-AthenaQueryRole
+aws iam get-role --role-name ST-CDCU-sit-GlueExecutionRole
+aws iam get-role --role-name ST-CDCU-sit-SageMakerExecutionRole
+aws iam get-role --role-name ST-CDCU-sit-AthenaQueryRole
 
-aws iam get-group --group-name ST-CDCU-pre-prod-CloudEngineering
-aws iam get-group --group-name ST-CDCU-pre-prod-DataEngineering
-aws iam get-group --group-name ST-CDCU-pre-prod-QA
+aws iam get-group --group-name ST-CDCU-sit-CloudEngineering
+aws iam get-group --group-name ST-CDCU-sit-DataEngineering
+aws iam get-group --group-name ST-CDCU-sit-QA
 
-aws s3 ls s3://cdcu-pre-prod-data-lake
-aws glue get-database --name cdcu_pre_prod_catalog --region ap-southeast-1
-aws athena get-work-group --work-group cdcu-pre-prod-workgroup --region ap-southeast-1
+aws s3 ls s3://cdcu-sit-data-lake
+aws glue get-database --name cdcu_sit_catalog --region ap-southeast-1
+aws athena get-work-group --work-group cdcu-sit-workgroup --region ap-southeast-1
 ```
 
 ---
@@ -379,12 +372,15 @@ aws athena get-work-group --work-group cdcu-pre-prod-workgroup --region ap-south
 | Step | Action | Owner |
 |---|---|---|
 | 1 | Review and approve Terraform scripts | BPI MS |
-| 2 | Set up Terraform deployment role (Option A) or IAM user (Option B pre-prod only) | BPI MS IT |
+| 2 | Set up Terraform deployment role. IAM user access is sandbox-only if temporarily required | BPI MS IT |
 | 3 | Confirm network prerequisites — VPC, subnet, SG, VPC endpoints | BPI MS |
-| 4 | Review Secrets Manager read-only exception requirement | BPI MS |
+| 4 | Review Secrets Manager container creation and read-only runtime exception requirement | BPI MS |
 | 5 | Fill `terraform.tfvars` with environment values | BPI MS |
-| 6 | Run `terraform apply` on pre-prod | BPI MS Cloud Engineer |
+| 6 | Run `terraform apply` on SIT | BPI MS Cloud Engineer |
 | 7 | Verify post-deployment checklist | Both teams |
 | 8 | Grant CE access to Stratpoint after scripts are reviewed and approved | BPI MS |
-| 9 | Migrate from IAM user to IAM role before prod (if Option B was used) | BPI MS IT |
-| 10 | Run `terraform apply` on prod after pre-prod sign-off | BPI MS Cloud Engineer |
+| 9 | Migrate from IAM user to IAM role before UAT/prod if Option B was used temporarily | BPI MS IT |
+| 10 | Run `terraform apply` on UAT and prod after sign-off | BPI MS Cloud Engineer |
+| 11 | Retire the legacy `pre-prod` root after migration/state decisions are confirmed | Stratpoint / BPI-MS review |
+| 12 | Add Secrets Manager container module if approved | Stratpoint / BPI-MS review |
+| 13 | Add CDCU-scoped Lake Formation grants if enabled | Stratpoint / BPI-MS review |

@@ -8,7 +8,19 @@ This repository provisions the Terraform-owned service layer for the CDCU data p
 MySQL RDS sources -> AWS Glue -> S3 -> SageMaker -> Athena -> QuickSight
 ```
 
-BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and approved Secrets Manager secret containers. Terraform consumes those existing IDs and ARNs as inputs, then provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
+BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and approved network paths. Terraform consumes those existing IDs and ARNs as inputs, then provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
+
+## Current BPI-MS Alignment Status
+
+The May 2026 BPI-MS review confirmed the target operating model below:
+
+- Target environments are formally separated as `sit/`, `uat/`, and `prod/`.
+- `pre-prod/` remains temporarily as a legacy/sandbox root and should not be used for new BPI-MS deployments.
+- BPI-MS will review/approve IAM policy resources by group: Cloud Engineering, Data Engineering, and QA.
+- VPC, subnet, security group, and RDS/MySQL configuration review is read-only from this repository. BPI-MS owns those resources.
+- Terraform should provision CDCU Secrets Manager secret containers using the approved names, but must not store or commit secret values.
+- Lake Formation is required when enabled by BPI-MS; CDCU-scoped Lake Formation grants should be added in a later Terraform phase.
+- CodePipeline access for Cloud Engineering is later scope and is not required for the current Phase 1 package.
 
 ## Terraform Scope
 
@@ -50,8 +62,10 @@ terraform-etl-analytics/
 |       `-- athena/             # Athena SQL files (*.sql)
 |-- bootstrap/                  # Optional remote state bootstrap helper
 |-- environments/
-|   |-- pre-prod/               # Pre-production root module
-|   `-- prod/                   # Production root module
+|   |-- sit/                    # System Integration Testing root module
+|   |-- uat/                    # User Acceptance Testing root module
+|   |-- prod/                   # Production root module
+|   `-- pre-prod/               # Legacy/sandbox root retained temporarily
 |-- modules/
 |   |-- artifacts/              # Uploads artifacts/* files to S3
 |   |-- athena/
@@ -63,7 +77,7 @@ terraform-etl-analytics/
 `-- docs/
 ```
 
-Enterprise KMS, security groups, Secrets Manager secret values, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
+Enterprise KMS, security groups, Secrets Manager secret values, Lake Formation account governance, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
 
 ## IAM Alignment
 
@@ -87,14 +101,14 @@ existing_quicksight_access_role_arn # optional, for BPI-managed QuickSight role 
 
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are deprecated compatibility inputs. Active environment roots use the `ST-CDCU` roles created by `modules/iam`.
 
-Glue connections expect these Secrets Manager secret names to already exist:
+Glue connections use these approved Secrets Manager secret names:
 
 ```text
 cdcu/{environment}/microsite-mysql-connection
 cdcu/{environment}/legacy-mysql-connection
 ```
 
-Terraform references the secret names only. It does not read or store database credentials in state.
+Current Terraform references the secret names only. The next alignment phase should add Terraform-managed secret containers for these names while keeping secret values, password rotation material, and database credentials outside Terraform state.
 
 ## DE Artifact Uploads
 
@@ -113,7 +127,7 @@ Directories containing only README files produce zero S3 objects. That is expect
 ## Local Execution
 
 ```bash
-cd environments/pre-prod
+cd environments/sit
 cp terraform.tfvars.example terraform.tfvars
 # Fill terraform.tfvars with BPI MS provided values
 terraform init
@@ -123,4 +137,4 @@ terraform plan -var-file="terraform.tfvars" -out=tfplan
 terraform apply tfplan
 ```
 
-Production uses the same flow from `environments/prod` and requires the prod GitHub environment approval gate for CI/CD applies.
+UAT and production use the same flow from `environments/uat` and `environments/prod`. Production requires the prod GitHub environment approval gate for CI/CD applies if CI/CD is enabled later.

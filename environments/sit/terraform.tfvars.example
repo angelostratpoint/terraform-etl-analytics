@@ -1,0 +1,53 @@
+# Copy to terraform.tfvars and fill in actual values.
+# Never commit terraform.tfvars to source control.
+
+environment = "sit"
+
+terraform_role_arn = "arn:aws:iam::123456789012:role/cdcu-sit-terraform-deployment-role"
+
+# VPC and subnet: obtain from BPI MS Cloud Engineer.
+# Only one subnet is needed for Glue connection placement.
+vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+subnet_ids = [
+  "subnet-xxxxxxxxxxxxxxxxx",
+]
+
+availability_zone = "ap-southeast-1a"
+
+github_org  = "your-github-org"
+github_repo = "terraform-etl-analytics"
+
+sso_principal_arns = [
+  "arn:aws:iam::123456789012:role/AWSReservedSSO_DataEngineer_xxxxxxxxxxxxxxxx"
+]
+
+# KMS is typically disabled in lower environments. If enabled, provide existing_kms_key_arn.
+enable_kms    = false
+sns_topic_arn = ""
+
+glue_worker_count = 2
+glue_worker_type  = "G.1X"
+
+microsite_jdbc_url = "jdbc:mysql://microsite-rds-endpoint.example.com:3306/microsite_db"
+legacy_jdbc_url    = "jdbc:mysql://legacy-rds-endpoint.example.com:3306/legacy_db"
+
+git_repository_url = "https://github.com/your-github-org/terraform-etl-analytics.git"
+
+enable_sagemaker_unified_studio = true
+sagemaker_studio_user_profile_names = [
+  "data-scientist-01",
+]
+sagemaker_studio_space_instance_type     = "ml.t3.medium"
+sagemaker_studio_space_volume_size_gb    = 5
+sagemaker_studio_app_network_access_type = "VpcOnly"
+
+# IAM/RBAC is managed by the modules/iam module using the ST-CDCU prefix.
+# manage_iam is a deprecated compatibility flag and has no effect.
+manage_iam                = false
+terraform_lock_table_name = "cdcu-terraform-locks-sit"
+
+# Client-managed baseline inputs from BPI MS / manual setup.
+existing_quicksight_access_role_arn = ""
+existing_kms_key_arn                = ""
+existing_security_group_id          = "sg-0123456789abcdef0"

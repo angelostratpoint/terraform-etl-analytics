@@ -9,7 +9,8 @@
 #   ./bootstrap.sh <environment> <aws_profile>
 #
 # EXAMPLES:
-#   ./bootstrap.sh pre-prod cdcu-pre-prod-profile
+#   ./bootstrap.sh sit cdcu-sit-profile
+#   ./bootstrap.sh uat cdcu-uat-profile
 #   ./bootstrap.sh prod cdcu-prod-profile
 #
 # PREREQUISITES:
@@ -26,12 +27,12 @@ REGION="ap-southeast-1"
 if [[ -z "$ENVIRONMENT" ]]; then
   echo "ERROR: Environment argument is required."
   echo "Usage: ./bootstrap.sh <environment> [aws_profile]"
-  echo "Valid environments: pre-prod, prod"
+  echo "Valid environments: sit, uat, prod"
   exit 1
 fi
 
-if [[ ! "$ENVIRONMENT" =~ ^(pre-prod|prod)$ ]]; then
-  echo "ERROR: Invalid environment '$ENVIRONMENT'. Must be one of: pre-prod, prod"
+if [[ ! "$ENVIRONMENT" =~ ^(sit|uat|prod)$ ]]; then
+  echo "ERROR: Invalid environment '$ENVIRONMENT'. Must be one of: sit, uat, prod"
   exit 1
 fi
 

@@ -73,14 +73,20 @@ terraform-etl-analytics/
 |   |-- s3/
 |   `-- sagemaker/
 `-- docs/
+    |-- bootstrap-guide.md      # Remote state backend setup
+    `-- deployment-guide.md     # Environment deployment steps
 ```
 
 Enterprise KMS, security groups, Secrets Manager secret values, Lake Formation account governance, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
 
-## IAM Alignment
+## Deployment Guides
 
-The BPI-MS IAM policy alignment reference is maintained in `docs/bpims-iam-policy-alignment.md`.
-It identifies implemented `ST-CDCU` roles/groups, group attachments, service policies, and approval-only items such as scoped PassRole, EventBridge service execution, and KMS runtime permissions.
+Use the retained BPI-MS handoff guides for setup and deployment:
+
+| Guide | Purpose |
+|---|---|
+| `docs/bootstrap-guide.md` | Creates or verifies the Terraform S3 state bucket and DynamoDB lock table |
+| `docs/deployment-guide.md` | Describes required BPI-MS inputs and the SIT/UAT/Prod Terraform run flow |
 
 ## Required External Inputs
 

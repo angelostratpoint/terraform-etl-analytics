@@ -1,27 +1,45 @@
 # CDCU Terraform Bootstrap Guide
 
-This guide covers the one-time setup required before running `terraform init` for any environment.
+This guide covers the one-time Terraform backend setup required before running
+`terraform init` for each CDCU environment.
 
-## What Bootstrap Provisions
+## Backend Resources
 
-| Resource | Name | Purpose |
+Terraform uses an S3 backend and DynamoDB state locking.
+
+| Resource | Naming pattern | Purpose |
 |---|---|---|
-| S3 Bucket | `cdcu-terraform-state-{environment}` | Stores Terraform remote state |
-| DynamoDB Table | `cdcu-terraform-locks-{environment}` | Prevents concurrent state writes |
+| S3 bucket | `cdcu-terraform-state-{env}` | Stores Terraform remote state |
+| DynamoDB table | `cdcu-terraform-locks-{env}` | Prevents concurrent Terraform state writes |
 
-These must exist **before** `terraform init` is run. They are not managed by Terraform itself.
+These backend resources must exist before `terraform init` is run. They are not
+created by the environment Terraform roots.
 
----
+## Environments
+
+Create one backend pair per environment:
+
+| Environment | State bucket | Lock table |
+|---|---|---|
+| SIT | `cdcu-terraform-state-sit` | `cdcu-terraform-locks-sit` |
+| UAT | `cdcu-terraform-state-uat` | `cdcu-terraform-locks-uat` |
+| Prod | `cdcu-terraform-state-prod` | `cdcu-terraform-locks-prod` |
+
+If BPI-MS requires account-specific suffixes for globally unique S3 bucket names,
+update the matching `backend.tf` file in the affected environment before running
+`terraform init`.
 
 ## Prerequisites
 
-- AWS CLI installed and configured
-- IAM user or role with `AdministratorAccess` or equivalent S3 and DynamoDB permissions
-- Target region: `ap-southeast-1`
+- AWS CLI v2 installed.
+- AWS credentials or role session configured for the target BPI-MS account.
+- Permissions to create or manage the approved Terraform backend S3 bucket and
+  DynamoDB lock table.
+- Target region: `ap-southeast-1`.
 
----
+## Bash Bootstrap
 
-## Option 1: Linux / macOS (bash)
+From the repository root:
 
 ```bash
 cd bootstrap
@@ -31,13 +49,12 @@ chmod +x bootstrap.sh
 ./bootstrap.sh prod
 ```
 
----
+## PowerShell Bootstrap
 
-## Option 2: Windows PowerShell (manual steps)
+Run the following commands per environment. Replace `sit` with `uat` or `prod`
+as needed.
 
-Run the following commands per environment. Replace `sit` with `uat` or `prod` as needed.
-
-### Step 1 — Create S3 state bucket
+Create the S3 state bucket:
 
 ```powershell
 aws s3api create-bucket `
@@ -46,7 +63,7 @@ aws s3api create-bucket `
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 ```
 
-### Step 2 — Enable versioning
+Enable bucket versioning:
 
 ```powershell
 aws s3api put-bucket-versioning `
@@ -54,7 +71,7 @@ aws s3api put-bucket-versioning `
   --versioning-configuration Status=Enabled
 ```
 
-### Step 3 — Block public access
+Block public access:
 
 ```powershell
 aws s3api put-public-access-block `
@@ -62,9 +79,7 @@ aws s3api put-public-access-block `
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
-> Note: S3 encryption (AES256) is enabled by default in `ap-southeast-1` since 2023. No manual encryption step is required.
-
-### Step 4 — Create DynamoDB lock table
+Create the DynamoDB lock table:
 
 ```powershell
 aws dynamodb create-table `
@@ -75,7 +90,7 @@ aws dynamodb create-table `
   --region ap-southeast-1
 ```
 
-### Step 5 — Wait for DynamoDB table to be active
+Wait for the lock table:
 
 ```powershell
 aws dynamodb wait table-exists `
@@ -83,38 +98,31 @@ aws dynamodb wait table-exists `
   --region ap-southeast-1
 ```
 
----
+## Verification
 
-## After Bootstrap
+Confirm the backend resources exist before `terraform init`:
 
-Once the S3 bucket and DynamoDB table are active, proceed with Terraform:
+```powershell
+aws s3api head-bucket --bucket cdcu-terraform-state-sit
+aws dynamodb describe-table `
+  --table-name cdcu-terraform-locks-sit `
+  --region ap-southeast-1 `
+  --query "Table.TableStatus"
+```
+
+The DynamoDB status should be `ACTIVE`.
+
+## Next Step
+
+After bootstrap, continue with the environment deployment guide:
 
 ```powershell
 cd environments/sit
 terraform init
 terraform validate
 terraform plan -var-file="terraform.tfvars" -out=tfplan
-terraform apply tfplan
 ```
 
----
-
-## Verification
-
-Confirm the backend resources exist before running `terraform init`:
-
-```powershell
-aws s3api head-bucket --bucket cdcu-terraform-state-sit
-aws dynamodb describe-table --table-name cdcu-terraform-locks-sit --region ap-southeast-1
-```
-
-Both commands should return without error.
-
----
-
-## Notes for BPI MS Environment
-
-- The bootstrap steps are run **once per environment** by the Stratpoint engineer during initial setup.
-- In the BPI MS AWS account, ensure the IAM role used has permissions to create S3 buckets and DynamoDB tables in `ap-southeast-1`.
-- The `dynamodb_table` parameter in `backend.tf` may show a deprecation warning in Terraform `>= 1.10`. This is a warning only and does not affect functionality. It will be updated to `use_lockfile` in a future release.
-- The S3 bucket name must be globally unique. If `cdcu-terraform-state-sit` is already taken, append an approved account/environment suffix and update `backend.tf` accordingly.
+The `dynamodb_table` backend argument may show a deprecation warning in newer
+Terraform versions. This is a warning only and does not block the current
+deployment flow.

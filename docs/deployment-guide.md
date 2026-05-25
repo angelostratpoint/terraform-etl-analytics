@@ -72,6 +72,56 @@ Expected backend resources:
 | UAT | `cdcu-terraform-state-uat` | `cdcu-terraform-locks-uat` |
 | Prod | `cdcu-terraform-state-prod` | `cdcu-terraform-locks-prod` |
 
+## AWS Credentials
+
+Terraform must be run by an approved BPI-MS IAM user, IAM role session, or AWS
+SSO role that has permission to:
+
+- access the Terraform S3 backend bucket,
+- access the Terraform DynamoDB lock table,
+- assume `terraform_role_arn`, and
+- provision the approved CDCU resources.
+
+Configure the AWS CLI before running Terraform.
+
+For access key based credentials:
+
+```powershell
+aws configure --profile bpi-ms-sit
+```
+
+Provide the BPI-MS approved values:
+
+```text
+AWS Access Key ID
+AWS Secret Access Key
+Default region name: ap-southeast-1
+Default output format: json
+```
+
+For AWS SSO based access:
+
+```powershell
+aws configure sso --profile bpi-ms-sit
+aws sso login --profile bpi-ms-sit
+```
+
+Set the active profile for the terminal session:
+
+```powershell
+$env:AWS_PROFILE = "bpi-ms-sit"
+$env:AWS_REGION  = "ap-southeast-1"
+```
+
+Confirm the caller identity before running Terraform:
+
+```powershell
+aws sts get-caller-identity
+```
+
+The returned account must be the approved BPI-MS AWS account for the target
+environment. Do not proceed if the account is not correct.
+
 ## Secrets
 
 Glue connections use these Secrets Manager names:
@@ -114,14 +164,64 @@ enterprise data governance rules.
 
 ## Deployment Steps
 
-From the repository root, choose the target environment.
+From the repository root, choose the target environment. The examples below use
+SIT. Replace `sit` with `uat` or `prod` for the other environments.
 
 ```powershell
 cd environments/sit
 Copy-Item terraform.tfvars.example terraform.tfvars
 ```
 
-Fill `terraform.tfvars` with BPI-MS approved values, then run:
+Open `terraform.tfvars` and replace the placeholder values with BPI-MS approved
+values.
+
+Required values to review:
+
+| Variable | What to set |
+|---|---|
+| `environment` | `sit`, `uat`, or `prod` |
+| `terraform_role_arn` | BPI-MS approved deployment role ARN |
+| `vpc_id` | Approved BPI-MS VPC ID |
+| `subnet_id` | Primary approved private subnet ID |
+| `subnet_ids` | Approved private subnet IDs for the environment |
+| `availability_zone` | Availability Zone of the primary subnet |
+| `github_org` | Approved GitHub organization or repository owner |
+| `github_repo` | Approved repository name |
+| `sso_principal_arns` | BPI-MS approved SSO role/user principal ARNs, if applicable |
+| `enable_kms` | `true` only when BPI-MS provides an approved KMS key |
+| `existing_kms_key_arn` | Required when `enable_kms = true` |
+| `sns_topic_arn` | Approved SNS topic ARN, or empty string if unused |
+| `glue_worker_count` | Approved Glue worker count |
+| `glue_worker_type` | Approved Glue worker type |
+| `microsite_jdbc_url` | Real Microsite MySQL RDS JDBC URL |
+| `legacy_jdbc_url` | Real Legacy MySQL RDS JDBC URL |
+| `git_repository_url` | Approved repository URL for SageMaker code repository |
+| `enable_sagemaker_unified_studio` | Whether to provision SageMaker Studio resources |
+| `sagemaker_studio_user_profile_names` | Approved SageMaker Studio user profile names |
+| `sagemaker_studio_space_instance_type` | Approved JupyterLab instance type |
+| `sagemaker_studio_space_volume_size_gb` | Approved JupyterLab EBS volume size |
+| `sagemaker_studio_app_network_access_type` | Usually `VpcOnly` |
+| `terraform_lock_table_name` | Environment lock table, such as `cdcu-terraform-locks-sit` |
+| `existing_quicksight_access_role_arn` | Approved QuickSight role ARN, or empty string |
+| `existing_security_group_id` | Approved CDCU runtime security group ID |
+
+The most important BPI-MS infrastructure inputs are:
+
+```hcl
+terraform_role_arn = "arn:aws:iam::<account-id>:role/<approved-terraform-role>"
+
+vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+subnet_ids = [
+  "subnet-xxxxxxxxxxxxxxxxx",
+]
+availability_zone         = "ap-southeast-1a"
+existing_security_group_id = "sg-xxxxxxxxxxxxxxxxx"
+
+terraform_lock_table_name = "cdcu-terraform-locks-sit"
+```
+
+After `terraform.tfvars` is updated, run:
 
 ```powershell
 terraform init
@@ -133,6 +233,35 @@ terraform apply tfplan
 
 For UAT and production, run the same flow from `environments/uat` and
 `environments/prod`.
+
+## Deployment Flow Summary
+
+Use this sequence per environment:
+
+```powershell
+# 1. Authenticate to the target BPI-MS AWS account
+$env:AWS_PROFILE = "bpi-ms-sit"
+$env:AWS_REGION  = "ap-southeast-1"
+aws sts get-caller-identity
+
+# 2. Go to the target Terraform root
+cd environments/sit
+
+# 3. Create and update terraform.tfvars
+Copy-Item terraform.tfvars.example terraform.tfvars
+notepad terraform.tfvars
+
+# 4. Initialize the backend
+terraform init
+
+# 5. Validate and review the plan
+terraform fmt -check -recursive ../../
+terraform validate
+terraform plan -var-file="terraform.tfvars" -out=tfplan
+
+# 6. Apply only after the plan is reviewed and approved
+terraform apply tfplan
+```
 
 ## Post-Deployment Checks
 

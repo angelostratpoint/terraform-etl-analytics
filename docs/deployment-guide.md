@@ -194,7 +194,7 @@ The following local files and credentials are not committed:
 Example:
 
 ```powershell
-git clone https://github.com/angelostratpoint/terraform-etl-analytics.git
+git clone <approved-bpi-ms-repository-url>
 cd terraform-etl-analytics
 git checkout bpi-ms-terraform
 

@@ -27,3 +27,13 @@ output "studio_space_names" {
   description = "Created SageMaker Studio JupyterLab space names"
   value       = [for space in aws_sagemaker_space.jupyterlab : space.space_name]
 }
+
+output "notebook_instance_name" {
+  description = "Created classic SageMaker Notebook Instance name"
+  value       = var.enable_notebook_instance ? aws_sagemaker_notebook_instance.classic[0].name : null
+}
+
+output "notebook_instance_arn" {
+  description = "Created classic SageMaker Notebook Instance ARN"
+  value       = var.enable_notebook_instance ? aws_sagemaker_notebook_instance.classic[0].arn : null
+}

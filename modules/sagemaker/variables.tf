@@ -76,6 +76,52 @@ variable "studio_space_volume_size_gb" {
   default     = 5
 }
 
+variable "enable_notebook_instance" {
+  description = "Whether to provision a classic SageMaker Notebook Instance in addition to Studio"
+  type        = bool
+  default     = false
+}
+
+variable "notebook_instance_name" {
+  description = "Optional explicit SageMaker Notebook Instance name. Leave empty to use cdcu-{environment}-notebook."
+  type        = string
+  default     = ""
+}
+
+variable "notebook_instance_type" {
+  description = "Instance type for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "ml.t3.medium"
+}
+
+variable "notebook_volume_size_gb" {
+  description = "EBS volume size in GB for the classic SageMaker Notebook Instance"
+  type        = number
+  default     = 5
+}
+
+variable "notebook_direct_internet_access" {
+  description = "Direct internet access setting for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "Disabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled"], var.notebook_direct_internet_access)
+    error_message = "notebook_direct_internet_access must be Enabled or Disabled."
+  }
+}
+
+variable "notebook_root_access" {
+  description = "Root access setting for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "Disabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled"], var.notebook_root_access)
+    error_message = "notebook_root_access must be Enabled or Disabled."
+  }
+}
+
 variable "tags" {
   description = "Common resource tags"
   type        = map(string)

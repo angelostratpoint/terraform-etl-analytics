@@ -30,7 +30,7 @@ Terraform owns:
 | Additional IAM/RBAC | `ST-CDCU` service roles, human groups, additive policies, and shared deny policies |
 | 3.3.1 AWS S3 Bucket Creation | Data lake and Athena results buckets |
 | 3.3.2 AWS Glue Provisioning and Folder Structuring | Glue catalog database, connections, jobs, S3 script paths |
-| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, JupyterLab spaces, code repository |
+| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, JupyterLab spaces, classic notebook instance, code repository |
 | 3.3.4 Amazon Athena Provisioning | Workgroup and query configuration |
 | 3.3.5 AWS Crawler Provisioning | Glue crawlers for raw, standardized, processed, and error prefixes |
 | 3.3.6 AWS QuickSight Provisioning | QuickSight groups, Athena data source, and dataset when enabled |

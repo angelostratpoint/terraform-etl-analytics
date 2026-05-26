@@ -239,6 +239,10 @@ Required values to review:
 | `sagemaker_studio_space_instance_type` | Approved JupyterLab instance type |
 | `sagemaker_studio_space_volume_size_gb` | Approved JupyterLab EBS volume size |
 | `sagemaker_studio_app_network_access_type` | Usually `VpcOnly` |
+| `enable_sagemaker_notebook_instance` | Whether to provision the classic SageMaker Notebook Instance |
+| `sagemaker_notebook_instance_name` | Approved classic SageMaker Notebook Instance name |
+| `sagemaker_notebook_instance_type` | Approved classic notebook instance type, default `ml.t3.medium` |
+| `sagemaker_notebook_volume_size_gb` | Approved classic notebook EBS volume size, default `5` |
 | `terraform_lock_table_name` | Environment lock table, such as `cdcu-terraform-locks-sit` |
 | `existing_quicksight_access_role_arn` | Approved QuickSight role ARN, or empty string |
 | `existing_security_group_id` | Approved CDCU runtime security group ID |
@@ -258,6 +262,10 @@ existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
 
 data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
 athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
+
+enable_sagemaker_notebook_instance = true
+sagemaker_notebook_instance_type   = "ml.t3.medium"
+sagemaker_notebook_volume_size_gb  = 5
 
 terraform_lock_table_name = "cdcu-terraform-locks-sit"
 ```

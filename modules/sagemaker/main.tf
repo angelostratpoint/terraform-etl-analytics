@@ -1,3 +1,8 @@
+locals {
+  notebook_instance_name = var.notebook_instance_name != "" ? var.notebook_instance_name : "cdcu-${var.environment}-notebook"
+  notebook_subnet_id     = length(var.subnet_ids) > 0 ? var.subnet_ids[0] : null
+}
+
 resource "aws_sagemaker_domain" "studio" {
   count = var.enable_unified_studio ? 1 : 0
 
@@ -77,4 +82,21 @@ resource "aws_sagemaker_space" "jupyterlab" {
   })
 
   depends_on = [aws_sagemaker_user_profile.data_scientists]
+}
+
+resource "aws_sagemaker_notebook_instance" "classic" {
+  count = var.enable_notebook_instance ? 1 : 0
+
+  name                   = local.notebook_instance_name
+  role_arn               = var.execution_role_arn
+  instance_type          = var.notebook_instance_type
+  subnet_id              = local.notebook_subnet_id
+  security_groups        = var.security_group_ids
+  volume_size            = var.notebook_volume_size_gb
+  direct_internet_access = var.notebook_direct_internet_access
+  root_access            = var.notebook_root_access
+
+  tags = merge(var.tags, {
+    Name = local.notebook_instance_name
+  })
 }

@@ -72,6 +72,11 @@ output "sagemaker_studio_space_names" {
   value       = module.sagemaker.studio_space_names
 }
 
+output "sagemaker_notebook_instance_name" {
+  description = "Classic SageMaker Notebook Instance name"
+  value       = module.sagemaker.notebook_instance_name
+}
+
 output "quicksight_data_source_arn" {
   description = "QuickSight Athena data source ARN"
   value       = module.quicksight.data_source_arn

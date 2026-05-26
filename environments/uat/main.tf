@@ -96,6 +96,12 @@ module "sagemaker" {
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
   studio_space_instance_type     = var.sagemaker_studio_space_instance_type
   studio_space_volume_size_gb    = var.sagemaker_studio_space_volume_size_gb
+  enable_notebook_instance        = var.enable_sagemaker_notebook_instance
+  notebook_instance_name          = var.sagemaker_notebook_instance_name
+  notebook_instance_type          = var.sagemaker_notebook_instance_type
+  notebook_volume_size_gb         = var.sagemaker_notebook_volume_size_gb
+  notebook_direct_internet_access = var.sagemaker_notebook_direct_internet_access
+  notebook_root_access            = var.sagemaker_notebook_root_access
   tags                           = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]

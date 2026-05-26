@@ -149,6 +149,42 @@ variable "sagemaker_studio_app_network_access_type" {
   default     = "VpcOnly"
 }
 
+variable "enable_sagemaker_notebook_instance" {
+  description = "Whether to provision a classic SageMaker Notebook Instance for CDCU"
+  type        = bool
+  default     = false
+}
+
+variable "sagemaker_notebook_instance_name" {
+  description = "Optional explicit classic SageMaker Notebook Instance name"
+  type        = string
+  default     = ""
+}
+
+variable "sagemaker_notebook_instance_type" {
+  description = "Instance type for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "ml.t3.medium"
+}
+
+variable "sagemaker_notebook_volume_size_gb" {
+  description = "EBS volume size in GB for the classic SageMaker Notebook Instance"
+  type        = number
+  default     = 5
+}
+
+variable "sagemaker_notebook_direct_internet_access" {
+  description = "Direct internet access setting for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "Disabled"
+}
+
+variable "sagemaker_notebook_root_access" {
+  description = "Root access setting for the classic SageMaker Notebook Instance"
+  type        = string
+  default     = "Disabled"
+}
+
 # Disabled by default — validate QuickSight access model in sandbox before enabling.
 # See docs/errors-and-resolutions.md Error 24 for context.
 variable "enable_quicksight" {

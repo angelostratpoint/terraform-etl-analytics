@@ -65,20 +65,10 @@ Terraform only consumes the approved IDs.
 ## Network Prerequisite
 
 Before Terraform runs, BPI-MS should deploy or verify the network prerequisites.
-The provided `vpc-assessment.yaml` template is intended for the current SIT OSP
-VPC baseline.
-
-Current SIT defaults:
-
-| Parameter | Value |
-|---|---|
-| `Environment` | `sit` |
-| `VpcId` | `vpc-034f6b0c6108b790f` |
-| `VpcCidr` | `10.190.0.0/16` |
-| `CDCUPrivateSubnetCidr` | `10.190.24.0/24` |
-| `CDCUAvailabilityZone` | `ap-southeast-1a` |
-| `PrivateRouteTableId` | `rtb-0788233a4e0fae9b9` |
-| `ExistingRdsSecurityGroupId` | `sg-06ff146518f2cfb34` |
+The provided `vpc-assessment.yaml` template is intended for BPI-MS-controlled
+network prerequisite provisioning inside the approved OSP VPC baseline. BPI-MS
+should supply the approved VPC, subnet CIDR, route table, availability zone, and
+RDS security group parameters at stack deployment time.
 
 The template creates:
 
@@ -258,13 +248,13 @@ The most important BPI-MS infrastructure inputs are:
 ```hcl
 terraform_role_arn = "arn:aws:iam::<account-id>:role/<approved-terraform-role>"
 
-vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
-subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+vpc_id    = "<CDCUVpcId output or approved BPI-MS VPC ID>"
+subnet_id = "<CDCUPrivateSubnetId output>"
 subnet_ids = [
-  "subnet-xxxxxxxxxxxxxxxxx",
+  "<CDCUPrivateSubnetId output>",
 ]
-availability_zone         = "ap-southeast-1a"
-existing_security_group_id = "sg-xxxxxxxxxxxxxxxxx"
+availability_zone          = "<CDCUAvailabilityZone output>"
+existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
 
 data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
 athena_results_bucket_name = "cdcu-sit-athena-results-apse1"

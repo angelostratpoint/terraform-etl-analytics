@@ -104,14 +104,14 @@ existing_kms_key_arn # required when enable_kms = true
 existing_quicksight_access_role_arn # optional, for BPI-managed QuickSight role references
 ```
 
-For SIT, the network values should come from the `vpc-assessment.yaml`
-CloudFormation stack outputs:
+For SIT, the network values should come from the BPI-MS-approved
+`vpc-assessment.yaml` CloudFormation stack outputs:
 
 ```hcl
-vpc_id                     = "vpc-034f6b0c6108b790f"
+vpc_id                     = "<CDCUVpcId output or approved BPI-MS VPC ID>"
 subnet_id                  = "<CDCUPrivateSubnetId output>"
 subnet_ids                 = ["<CDCUPrivateSubnetId output>"]
-availability_zone          = "ap-southeast-1a"
+availability_zone          = "<CDCUAvailabilityZone output>"
 existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
 ```
 

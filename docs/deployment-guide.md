@@ -5,10 +5,11 @@ It is organized into separate environment roots for SIT, UAT, and production.
 
 Terraform provisions CDCU-managed resources such as S3, Glue, Athena,
 SageMaker, QuickSight configuration, and the additional `ST-CDCU` IAM resources
-defined for the project. Terraform does not own the BPI-MS enterprise network
-baseline. The VPC, private subnet, security group, endpoints, KMS baseline, and
-source database connectivity must be approved by BPI-MS and passed into
-Terraform as inputs.
+defined for the project. Terraform does not own the BPI-MS enterprise VPC or
+route table baseline. The provided `vpc-assessment.yaml` CloudFormation template
+can be used by BPI-MS to create the CDCU private subnet, runtime security group,
+and required interface endpoints in the approved OSP VPC. Terraform consumes the
+approved VPC, subnet, and security group outputs as inputs.
 
 ## Repository Environments
 
@@ -27,11 +28,11 @@ The Terraform implementation uses these CDCU naming patterns:
 
 | Resource area | Pattern | Example |
 |---|---|---|
-| AWS service resources | `cdcu-{env}-*` | `cdcu-sit-data-lake` |
+| AWS service resources | `cdcu-{env}-*` with approved suffixes when required | `cdcu-sit-data-lake-apse1` |
 | Secrets Manager paths | `cdcu/{env}/*` | `cdcu/sit/microsite-mysql-connection` |
 | Glue catalog database | `cdcu_{env}_catalog` | `cdcu_sit_catalog` |
 | IAM roles, groups, policies | `ST-CDCU-{env}-*` | `ST-CDCU-sit-GlueExecutionRole` |
-| Terraform backend bucket | `cdcu-terraform-state-{env}` | `cdcu-terraform-state-sit` |
+| Terraform backend bucket | BPI-MS approved unique name | `cdcu-terraform-state-sit-apse1` |
 | Terraform lock table | `cdcu-terraform-locks-{env}` | `cdcu-terraform-locks-sit` |
 
 ## Required BPI-MS Inputs
@@ -43,11 +44,13 @@ target environment:
 |---|---|
 | `terraform_role_arn` | IAM role Terraform assumes during deployment |
 | `vpc_id` | Approved BPI-MS VPC for CDCU runtime placement |
-| `subnet_id` | Primary approved private subnet for Glue placement |
-| `subnet_ids` | Approved private subnet list for SageMaker and related services |
+| `subnet_id` | `CDCUPrivateSubnetId` output from `vpc-assessment.yaml` |
+| `subnet_ids` | Approved private subnet list; for SIT use the `CDCUPrivateSubnetId` output |
 | `availability_zone` | Availability zone matching the primary subnet |
-| `existing_security_group_id` | Approved runtime security group for Glue and SageMaker |
+| `existing_security_group_id` | `CDCURuntimeSecurityGroupId` output from `vpc-assessment.yaml` |
 | `terraform_lock_table_name` | DynamoDB table used by Terraform state locking |
+| `data_lake_bucket_name` | Approved data lake bucket name, such as `cdcu-sit-data-lake-apse1` |
+| `athena_results_bucket_name` | Approved Athena results bucket name, such as `cdcu-sit-athena-results-apse1` |
 | `existing_kms_key_arn` | BPI-MS KMS key ARN when KMS is enabled |
 | `microsite_jdbc_url` | Microsite MySQL RDS JDBC URL |
 | `legacy_jdbc_url` | Legacy MySQL RDS JDBC URL |
@@ -55,9 +58,52 @@ target environment:
 | `quicksight_admin_principal_arn` | Approved QuickSight principal when QuickSight is enabled |
 
 The approved subnet and security group must support private Glue/SageMaker
-runtime connectivity to the source MySQL RDS environment and required AWS
+runtime connectivity to the source MySQL RDS environment, S3, and required AWS
 managed-service endpoints. Keep the network resource ownership with BPI-MS;
 Terraform only consumes the approved IDs.
+
+## Network Prerequisite
+
+Before Terraform runs, BPI-MS should deploy or verify the network prerequisites.
+The provided `vpc-assessment.yaml` template is intended for the current SIT OSP
+VPC baseline.
+
+Current SIT defaults:
+
+| Parameter | Value |
+|---|---|
+| `Environment` | `sit` |
+| `VpcId` | `vpc-034f6b0c6108b790f` |
+| `VpcCidr` | `10.190.0.0/16` |
+| `CDCUPrivateSubnetCidr` | `10.190.24.0/24` |
+| `CDCUAvailabilityZone` | `ap-southeast-1a` |
+| `PrivateRouteTableId` | `rtb-0788233a4e0fae9b9` |
+| `ExistingRdsSecurityGroupId` | `sg-06ff146518f2cfb34` |
+
+The template creates:
+
+| Resource | Purpose |
+|---|---|
+| `cdcu-sit-private-subnet-1a` | Private runtime subnet for CDCU managed services |
+| `cdcu-sit-runtime-sg` | Runtime security group for Glue and SageMaker |
+| Self-referencing SG ingress | Required for managed-service runtime ENI communication |
+| Interface endpoints | Secrets Manager, Glue, CloudWatch Logs, KMS, SageMaker API, SageMaker Runtime, and STS |
+
+The template intentionally does not create an S3 Gateway endpoint because the
+BPI-MS private route table already has the S3 prefix-list route. The runtime
+security group allows outbound HTTPS to the existing S3 prefix list
+`pl-6fa54006`.
+
+After the CloudFormation stack completes, copy these outputs into
+`terraform.tfvars`:
+
+```hcl
+vpc_id                     = "<CDCUVpcId output>"
+subnet_id                  = "<CDCUPrivateSubnetId output>"
+subnet_ids                 = ["<CDCUPrivateSubnetId output>"]
+availability_zone          = "<CDCUAvailabilityZone output>"
+existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
+```
 
 ## Backend Prerequisite
 
@@ -68,7 +114,7 @@ Expected backend resources:
 
 | Environment | State bucket | Lock table |
 |---|---|---|
-| SIT | `cdcu-terraform-state-sit` | `cdcu-terraform-locks-sit` |
+| SIT | `cdcu-terraform-state-sit-apse1` | `cdcu-terraform-locks-sit` |
 | UAT | `cdcu-terraform-state-uat` | `cdcu-terraform-locks-uat` |
 | Prod | `cdcu-terraform-state-prod` | `cdcu-terraform-locks-prod` |
 
@@ -182,9 +228,11 @@ Required values to review:
 | `environment` | `sit`, `uat`, or `prod` |
 | `terraform_role_arn` | BPI-MS approved deployment role ARN |
 | `vpc_id` | Approved BPI-MS VPC ID |
-| `subnet_id` | Primary approved private subnet ID |
-| `subnet_ids` | Approved private subnet IDs for the environment |
+| `subnet_id` | `CDCUPrivateSubnetId` from `vpc-assessment.yaml` |
+| `subnet_ids` | `CDCUPrivateSubnetId` from `vpc-assessment.yaml`, unless BPI-MS approves more subnets |
 | `availability_zone` | Availability Zone of the primary subnet |
+| `data_lake_bucket_name` | Approved data lake bucket name |
+| `athena_results_bucket_name` | Approved Athena results bucket name |
 | `github_org` | Approved GitHub organization or repository owner |
 | `github_repo` | Approved repository name |
 | `sso_principal_arns` | BPI-MS approved SSO role/user principal ARNs, if applicable |
@@ -218,6 +266,9 @@ subnet_ids = [
 availability_zone         = "ap-southeast-1a"
 existing_security_group_id = "sg-xxxxxxxxxxxxxxxxx"
 
+data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
+athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
+
 terraform_lock_table_name = "cdcu-terraform-locks-sit"
 ```
 
@@ -244,22 +295,25 @@ $env:AWS_PROFILE = "bpi-ms-sit"
 $env:AWS_REGION  = "ap-southeast-1"
 aws sts get-caller-identity
 
-# 2. Go to the target Terraform root
+# 2. Deploy or verify vpc-assessment.yaml in CloudFormation
+#    Then copy CDCUPrivateSubnetId and CDCURuntimeSecurityGroupId into terraform.tfvars.
+
+# 3. Go to the target Terraform root
 cd environments/sit
 
-# 3. Create and update terraform.tfvars
+# 4. Create and update terraform.tfvars
 Copy-Item terraform.tfvars.example terraform.tfvars
 notepad terraform.tfvars
 
-# 4. Initialize the backend
+# 5. Initialize the backend
 terraform init
 
-# 5. Validate and review the plan
+# 6. Validate and review the plan
 terraform fmt -check -recursive ../../
 terraform validate
 terraform plan -var-file="terraform.tfvars" -out=tfplan
 
-# 6. Apply only after the plan is reviewed and approved
+# 7. Apply only after the plan is reviewed and approved
 terraform apply tfplan
 ```
 
@@ -270,7 +324,7 @@ Run these from the environment folder after `terraform apply` completes:
 ```powershell
 terraform output
 
-aws s3 ls s3://cdcu-sit-data-lake --region ap-southeast-1
+aws s3 ls s3://cdcu-sit-data-lake-apse1 --region ap-southeast-1
 
 aws glue get-database `
   --name cdcu_sit_catalog `

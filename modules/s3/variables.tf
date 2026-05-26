@@ -15,6 +15,18 @@ variable "kms_key_arn" {
   default     = ""
 }
 
+variable "data_lake_bucket_name" {
+  description = "Optional explicit CDCU data lake bucket name. Leave empty to use cdcu-{environment}-data-lake."
+  type        = string
+  default     = ""
+}
+
+variable "athena_results_bucket_name" {
+  description = "Optional explicit Athena results bucket name. Leave empty to use cdcu-{environment}-athena-results."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Common resource tags"
   type        = map(string)

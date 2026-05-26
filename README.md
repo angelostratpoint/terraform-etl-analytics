@@ -8,7 +8,7 @@ This repository provisions the Terraform-owned service layer for the CDCU data p
 MySQL RDS sources -> AWS Glue -> S3 -> SageMaker -> Athena -> QuickSight
 ```
 
-BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and approved network paths. Terraform consumes those existing IDs and ARNs as inputs, then provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
+BPI MS / Stratpoint prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC route table, KMS baseline, source database access, and approved network paths. The provided `vpc-assessment.yaml` CloudFormation template can create the CDCU private subnet, runtime security group, and required interface endpoints inside the approved BPI-MS OSP VPC. Terraform then consumes the CloudFormation outputs and provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
 
 ## Current BPI-MS Alignment Status
 
@@ -16,7 +16,7 @@ The May 2026 BPI-MS review confirmed the target operating model below:
 
 - Target environments are formally separated as `sit/`, `uat/`, and `prod/`.
 - BPI-MS will review/approve IAM policy resources by group: Cloud Engineering, Data Engineering, and QA.
-- VPC, subnet, security group, and RDS/MySQL configuration review is read-only from this repository. BPI-MS owns those resources.
+- BPI-MS owns VPC, route table, security group, endpoint, and RDS/MySQL governance. The optional `vpc-assessment.yaml` template is provided for BPI-MS-controlled network prerequisite provisioning.
 - Terraform should provision CDCU Secrets Manager secret containers using the approved names, but must not store or commit secret values.
 - Lake Formation is required when enabled by BPI-MS; CDCU-scoped Lake Formation grants should be added in a later Terraform phase.
 - CodePipeline access for Cloud Engineering is later scope and is not required for the current Phase 1 package.
@@ -60,6 +60,7 @@ terraform-etl-analytics/
 |   `-- sql/
 |       `-- athena/             # Athena SQL files (*.sql)
 |-- bootstrap/                  # Optional remote state bootstrap helper
+|-- vpc-assessment.yaml         # BPI-MS CloudFormation network prerequisites
 |-- environments/
 |   |-- sit/                    # System Integration Testing root module
 |   |-- uat/                    # User Acceptance Testing root module
@@ -103,6 +104,24 @@ existing_kms_key_arn # required when enable_kms = true
 existing_quicksight_access_role_arn # optional, for BPI-managed QuickSight role references
 ```
 
+For SIT, the network values should come from the `vpc-assessment.yaml`
+CloudFormation stack outputs:
+
+```hcl
+vpc_id                     = "vpc-034f6b0c6108b790f"
+subnet_id                  = "<CDCUPrivateSubnetId output>"
+subnet_ids                 = ["<CDCUPrivateSubnetId output>"]
+availability_zone          = "ap-southeast-1a"
+existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
+```
+
+BPI-MS SIT bucket names currently use the regional suffix:
+
+```hcl
+data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
+athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
+```
+
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are deprecated compatibility inputs. Active environment roots use the `ST-CDCU` roles created by `modules/iam`.
 
 Glue connections use these approved Secrets Manager secret names:
@@ -131,6 +150,9 @@ Directories containing only README files produce zero S3 objects. That is expect
 ## Local Execution
 
 ```bash
+# Optional BPI-MS network prerequisite, run through CloudFormation first:
+# vpc-assessment.yaml
+
 cd environments/sit
 cp terraform.tfvars.example terraform.tfvars
 # Fill terraform.tfvars with BPI MS provided values

@@ -5,7 +5,7 @@ environment = "prod"
 
 terraform_role_arn = "arn:aws:iam::123456789012:role/cdcu-prod-terraform-deployment-role"
 
-# VPC and subnet: obtain from BPI MS Cloud Engineer.
+# VPC and subnet: use vpc-assessment.yaml CloudFormation outputs after BPI-MS approval.
 vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
 subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
 subnet_ids = [
@@ -25,18 +25,21 @@ sso_principal_arns = [
 enable_kms    = true
 sns_topic_arn = "arn:aws:sns:ap-southeast-1:123456789012:cdcu-prod-alerts"
 
+data_lake_bucket_name      = "cdcu-prod-data-lake-apse1"
+athena_results_bucket_name = "cdcu-prod-athena-results-apse1"
+
 glue_worker_count = 10
 glue_worker_type  = "G.1X"
 
 microsite_jdbc_url = "jdbc:mysql://microsite-rds-endpoint.example.com:3306/microsite_db"
 legacy_jdbc_url    = "jdbc:mysql://legacy-rds-endpoint.example.com:3306/legacy_db"
 
-git_repository_url = "https://github.com/your-github-org/terraform-etl-analytics.git"
+git_repository_url = "https://git-codecommit.ap-southeast-1.amazonaws.com/v1/repos/cdcu"
 
 enable_sagemaker_unified_studio = true
 sagemaker_studio_user_profile_names = [
-  "data-scientist-01",
-  "data-scientist-02",
+  "data-engineer-01",
+  "data-engineer-02",
 ]
 sagemaker_studio_space_instance_type     = "ml.t3.medium"
 sagemaker_studio_space_volume_size_gb    = 5

@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket         = "cdcu-terraform-state-sit"
+    bucket         = "cdcu-terraform-state-sit-apse1"
     key            = "cdcu/sit/terraform.tfstate"
     region         = "ap-southeast-1"
     dynamodb_table = "cdcu-terraform-locks-sit"

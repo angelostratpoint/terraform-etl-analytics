@@ -63,6 +63,18 @@ variable "enable_kms" {
   default     = true
 }
 
+variable "data_lake_bucket_name" {
+  description = "Explicit CDCU data lake bucket name approved by BPI-MS. Leave empty to use the module default."
+  type        = string
+  default     = ""
+}
+
+variable "athena_results_bucket_name" {
+  description = "Explicit Athena results bucket name approved by BPI-MS. Leave empty to use the module default."
+  type        = string
+  default     = ""
+}
+
 # Reserved for future use — CloudWatch alarms pending BPI MS approval. Not currently passed to any module.
 variable "sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarm notifications"
@@ -116,7 +128,7 @@ variable "enable_sagemaker_unified_studio" {
 variable "sagemaker_studio_user_profile_names" {
   description = "SageMaker Studio user profile names to create"
   type        = list(string)
-  default     = ["data-scientist-01", "data-scientist-02"]
+  default     = ["data-engineer-01", "data-engineer-02"]
 }
 
 variable "sagemaker_studio_space_instance_type" {

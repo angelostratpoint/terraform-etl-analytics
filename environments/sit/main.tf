@@ -30,10 +30,12 @@ resource "terraform_data" "manual_baseline_contract" {
 module "s3" {
   source = "../../modules/s3"
 
-  environment = local.environment
-  enable_kms  = var.enable_kms
-  kms_key_arn = local.kms_key_arn
-  tags        = local.common_tags
+  environment                = local.environment
+  enable_kms                 = var.enable_kms
+  kms_key_arn                = local.kms_key_arn
+  data_lake_bucket_name      = var.data_lake_bucket_name
+  athena_results_bucket_name = var.athena_results_bucket_name
+  tags                       = local.common_tags
 }
 
 module "iam" {

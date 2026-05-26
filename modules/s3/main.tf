@@ -1,5 +1,6 @@
 locals {
-  bucket_name = "cdcu-${var.environment}-data-lake"
+  bucket_name                 = var.data_lake_bucket_name != "" ? var.data_lake_bucket_name : "cdcu-${var.environment}-data-lake"
+  athena_results_bucket_name = var.athena_results_bucket_name != "" ? var.athena_results_bucket_name : "cdcu-${var.environment}-athena-results"
 }
 
 resource "aws_s3_bucket" "cdcu_data_lake" {
@@ -177,10 +178,10 @@ resource "aws_s3_object" "folder_placeholders" {
 }
 
 resource "aws_s3_bucket" "cdcu_athena_results" {
-  bucket = "cdcu-${var.environment}-athena-results"
+  bucket = local.athena_results_bucket_name
 
   tags = merge(var.tags, {
-    Name               = "cdcu-${var.environment}-athena-results"
+    Name               = local.athena_results_bucket_name
     DataClassification = "Internal"
   })
 }

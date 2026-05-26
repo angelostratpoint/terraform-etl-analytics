@@ -9,7 +9,7 @@ Terraform uses an S3 backend and DynamoDB state locking.
 
 | Resource | Naming pattern | Purpose |
 |---|---|---|
-| S3 bucket | `cdcu-terraform-state-{env}` | Stores Terraform remote state |
+| S3 bucket | `cdcu-terraform-state-{env}` or BPI-MS approved unique variant | Stores Terraform remote state |
 | DynamoDB table | `cdcu-terraform-locks-{env}` | Prevents concurrent Terraform state writes |
 
 These backend resources must exist before `terraform init` is run. They are not
@@ -21,13 +21,13 @@ Create one backend pair per environment:
 
 | Environment | State bucket | Lock table |
 |---|---|---|
-| SIT | `cdcu-terraform-state-sit` | `cdcu-terraform-locks-sit` |
+| SIT | `cdcu-terraform-state-sit-apse1` | `cdcu-terraform-locks-sit` |
 | UAT | `cdcu-terraform-state-uat` | `cdcu-terraform-locks-uat` |
 | Prod | `cdcu-terraform-state-prod` | `cdcu-terraform-locks-prod` |
 
 If BPI-MS requires account-specific suffixes for globally unique S3 bucket names,
-update the matching `backend.tf` file in the affected environment before running
-`terraform init`.
+the matching `backend.tf` file must use the approved bucket name before running
+`terraform init`. SIT is currently aligned to `cdcu-terraform-state-sit-apse1`.
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ Create the S3 state bucket:
 
 ```powershell
 aws s3api create-bucket `
-  --bucket cdcu-terraform-state-sit `
+  --bucket cdcu-terraform-state-sit-apse1 `
   --region ap-southeast-1 `
   --create-bucket-configuration LocationConstraint=ap-southeast-1
 ```
@@ -67,7 +67,7 @@ Enable bucket versioning:
 
 ```powershell
 aws s3api put-bucket-versioning `
-  --bucket cdcu-terraform-state-sit `
+  --bucket cdcu-terraform-state-sit-apse1 `
   --versioning-configuration Status=Enabled
 ```
 
@@ -75,7 +75,7 @@ Block public access:
 
 ```powershell
 aws s3api put-public-access-block `
-  --bucket cdcu-terraform-state-sit `
+  --bucket cdcu-terraform-state-sit-apse1 `
   --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
@@ -103,7 +103,7 @@ aws dynamodb wait table-exists `
 Confirm the backend resources exist before `terraform init`:
 
 ```powershell
-aws s3api head-bucket --bucket cdcu-terraform-state-sit
+aws s3api head-bucket --bucket cdcu-terraform-state-sit-apse1
 aws dynamodb describe-table `
   --table-name cdcu-terraform-locks-sit `
   --region ap-southeast-1 `

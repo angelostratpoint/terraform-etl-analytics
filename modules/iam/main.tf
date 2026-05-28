@@ -134,7 +134,7 @@ resource "aws_iam_policy" "glue_etl" {
         Effect = "Allow"
         Action = [
           "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
-          "glue:GetTable", "glue:GetTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
+          "glue:GetTable", "glue:GetTables", "glue:SearchTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
           "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
           "glue:BatchGetPartition"
         ]
@@ -417,6 +417,34 @@ resource "aws_iam_policy" "sagemaker_cloudwatch" {
   tags = var.tags
 }
 
+resource "aws_iam_policy" "sagemaker_amazon_q" {
+  name = "ST-CDCU-${local.env}-SageMakerAmazonQAccess"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AmazonQDeveloperInSageMakerStudio"
+        Effect = "Allow"
+        Action = [
+          "q:StartConversation",
+          "q:SendMessage",
+          "q:GetConversation",
+          "q:ListConversations",
+          "q:PassRequest",
+          "sagemaker-data-science-assistant:SendConversation",
+          "sagemaker-data-science-assistant:GetConversation",
+          "sagemaker-data-science-assistant:ListConversations",
+          "codewhisperer:GenerateRecommendations"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
 resource "aws_iam_role_policy_attachment" "sagemaker_access" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = aws_iam_policy.sagemaker_access.arn
@@ -430,6 +458,11 @@ resource "aws_iam_role_policy_attachment" "sagemaker_s3" {
 resource "aws_iam_role_policy_attachment" "sagemaker_cloudwatch" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = aws_iam_policy.sagemaker_cloudwatch.arn
+}
+
+resource "aws_iam_role_policy_attachment" "sagemaker_amazon_q" {
+  role       = aws_iam_role.sagemaker_execution.name
+  policy_arn = aws_iam_policy.sagemaker_amazon_q.arn
 }
 
 resource "aws_iam_role_policy_attachment" "sagemaker_deny" {
@@ -500,6 +533,7 @@ resource "aws_iam_policy" "athena_access" {
           "glue:GetDatabases",
           "glue:GetTable",
           "glue:GetTables",
+          "glue:SearchTables",
           "glue:GetPartition",
           "glue:GetPartitions"
         ]

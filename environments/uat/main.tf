@@ -24,6 +24,11 @@ resource "terraform_data" "manual_baseline_contract" {
       condition     = !var.enable_kms || var.existing_kms_key_arn != ""
       error_message = "existing_kms_key_arn is required when enable_kms = true. KMS baseline is manually provisioned by BPI MS."
     }
+
+    precondition {
+      condition     = var.merged_jdbc_url != "" || (var.microsite_jdbc_url != "" && var.legacy_jdbc_url != "")
+      error_message = "Provide merged_jdbc_url for the shared BPI MS source database, or provide both microsite_jdbc_url and legacy_jdbc_url for separate source databases."
+    }
   }
 }
 
@@ -63,9 +68,11 @@ module "glue" {
   availability_zone       = var.availability_zone
   glue_worker_count       = var.glue_worker_count
   glue_worker_type        = var.glue_worker_type
-  microsite_jdbc_url      = var.microsite_jdbc_url
-  legacy_jdbc_url         = var.legacy_jdbc_url
-  tags                    = local.common_tags
+  microsite_jdbc_url       = var.microsite_jdbc_url
+  legacy_jdbc_url          = var.legacy_jdbc_url
+  merged_jdbc_url          = var.merged_jdbc_url
+  merged_mysql_secret_name = var.merged_mysql_secret_name
+  tags                     = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]
 }

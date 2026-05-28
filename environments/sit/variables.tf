@@ -95,23 +95,42 @@ variable "glue_worker_type" {
 }
 
 variable "microsite_jdbc_url" {
-  description = "JDBC URL for the BPI MS Microsite MySQL source database"
+  description = "Optional fallback JDBC URL for the BPI MS Microsite MySQL source database when merged_jdbc_url is not set."
   type        = string
+  default     = ""
 
   validation {
-    condition     = startswith(var.microsite_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.microsite_jdbc_url)))
-    error_message = "microsite_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+    condition     = var.microsite_jdbc_url == "" || (startswith(var.microsite_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.microsite_jdbc_url))))
+    error_message = "microsite_jdbc_url must be blank or a non-local MySQL JDBC URL from BPI MS."
   }
 }
 
 variable "legacy_jdbc_url" {
-  description = "JDBC URL for the BPI MS Legacy MySQL source database"
+  description = "Optional fallback JDBC URL for the BPI MS Legacy MySQL source database when merged_jdbc_url is not set."
   type        = string
+  default     = ""
 
   validation {
-    condition     = startswith(var.legacy_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.legacy_jdbc_url)))
-    error_message = "legacy_jdbc_url must be a non-local MySQL JDBC URL from BPI MS."
+    condition     = var.legacy_jdbc_url == "" || (startswith(var.legacy_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.legacy_jdbc_url))))
+    error_message = "legacy_jdbc_url must be blank or a non-local MySQL JDBC URL from BPI MS."
   }
+}
+
+variable "merged_jdbc_url" {
+  description = "Optional merged MySQL JDBC URL used by both Microsite and Legacy flows when BPI-MS provides one shared source database."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.merged_jdbc_url == "" || (startswith(var.merged_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.merged_jdbc_url))))
+    error_message = "merged_jdbc_url must be blank or a non-local MySQL JDBC URL from BPI MS."
+  }
+}
+
+variable "merged_mysql_secret_name" {
+  description = "Optional Secrets Manager secret name for the merged MySQL source database. When set, both source Glue connections use this secret."
+  type        = string
+  default     = ""
 }
 
 variable "git_repository_url" {

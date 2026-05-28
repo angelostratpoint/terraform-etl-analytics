@@ -1,10 +1,18 @@
 # Separate secrets for Microsite and Legacy — two distinct MySQL source databases
+locals {
+  microsite_effective_jdbc_url = var.merged_jdbc_url != "" ? var.merged_jdbc_url : var.microsite_jdbc_url
+  legacy_effective_jdbc_url    = var.merged_jdbc_url != "" ? var.merged_jdbc_url : var.legacy_jdbc_url
+
+  microsite_effective_secret_name = var.merged_mysql_secret_name != "" ? var.merged_mysql_secret_name : "cdcu/${var.environment}/microsite-mysql-connection"
+  legacy_effective_secret_name    = var.merged_mysql_secret_name != "" ? var.merged_mysql_secret_name : "cdcu/${var.environment}/legacy-mysql-connection"
+}
+
 data "aws_secretsmanager_secret" "microsite_mysql_connection" {
-  name = "cdcu/${var.environment}/microsite-mysql-connection"
+  name = local.microsite_effective_secret_name
 }
 
 data "aws_secretsmanager_secret" "legacy_mysql_connection" {
-  name = "cdcu/${var.environment}/legacy-mysql-connection"
+  name = local.legacy_effective_secret_name
 }
 
 resource "aws_glue_catalog_database" "cdcu" {
@@ -18,8 +26,8 @@ resource "aws_glue_connection" "microsite_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = var.microsite_jdbc_url
-    SECRET_ID           = "cdcu/${var.environment}/microsite-mysql-connection"
+    JDBC_CONNECTION_URL = local.microsite_effective_jdbc_url
+    SECRET_ID           = local.microsite_effective_secret_name
   }
 
   physical_connection_requirements {
@@ -39,8 +47,8 @@ resource "aws_glue_connection" "legacy_mysql" {
   connection_type = "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = var.legacy_jdbc_url
-    SECRET_ID           = "cdcu/${var.environment}/legacy-mysql-connection"
+    JDBC_CONNECTION_URL = local.legacy_effective_jdbc_url
+    SECRET_ID           = local.legacy_effective_secret_name
   }
 
   physical_connection_requirements {
@@ -77,7 +85,7 @@ resource "aws_glue_job" "microsite_raw_extraction" {
     "--SOURCE_CONNECTION"                = aws_glue_connection.microsite_mysql.name
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/microsite/"
     "--ENVIRONMENT"                      = var.environment
-    "--SECRET_NAME"                      = "cdcu/${var.environment}/microsite-mysql-connection"
+    "--SECRET_NAME"                      = local.microsite_effective_secret_name
   }
 
   connections = [aws_glue_connection.microsite_mysql.name]
@@ -115,7 +123,7 @@ resource "aws_glue_job" "legacy_raw_extraction" {
     "--SOURCE_CONNECTION"                = aws_glue_connection.legacy_mysql.name
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/legacy/"
     "--ENVIRONMENT"                      = var.environment
-    "--SECRET_NAME"                      = "cdcu/${var.environment}/legacy-mysql-connection"
+    "--SECRET_NAME"                      = local.legacy_effective_secret_name
   }
 
   connections = [aws_glue_connection.legacy_mysql.name]

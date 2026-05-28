@@ -124,14 +124,26 @@ athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
 
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are deprecated compatibility inputs. Active environment roots use the `ST-CDCU` roles created by `modules/iam`.
 
-Glue connections use these approved Secrets Manager secret names:
+Glue connections can use one merged BPI-MS MySQL source secret when Microsite
+and Legacy are hosted in the same database:
+
+```text
+cdcu/{environment}/merged-mysql-connection
+```
+
+When `merged_jdbc_url` and `merged_mysql_secret_name` are set, both existing
+Microsite and Legacy Glue flows use the merged JDBC URL and secret while keeping
+their separate raw and standardized S3 paths.
+
+The older separate secret names remain supported as a compatibility fallback:
 
 ```text
 cdcu/{environment}/microsite-mysql-connection
 cdcu/{environment}/legacy-mysql-connection
 ```
 
-Current Terraform references the secret names only. The next alignment phase should add Terraform-managed secret containers for these names while keeping secret values, password rotation material, and database credentials outside Terraform state.
+Terraform references the secret names only. Secret values, password rotation
+material, and database credentials must remain outside Terraform state.
 
 ## DE Artifact Uploads
 

@@ -15,6 +15,13 @@ tfplan
 *.tfvars
 !*.tfvars.example
 
+# Root-level CloudFormation/review artifacts are uploaded separately when approved
+/*.yaml
+/*.yml
+*.zip
+docs/data-engineering-access-patch-brief.md
+docs/runtime-connectivity-validation.md
+
 # Crash log files
 crash.log
 crash.*.log

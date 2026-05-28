@@ -5,10 +5,12 @@ data "aws_secretsmanager_secret" "merged_mysql_connection" {
 locals {
   mysql_jdbc_connection_properties = merge(
     {
-      JDBC_CONNECTION_URL    = var.merged_jdbc_url
-      SECRET_ID              = var.merged_mysql_secret_name
-      JDBC_DRIVER_CLASS_NAME = var.mysql_jdbc_driver_class_name
+      JDBC_CONNECTION_URL = var.merged_jdbc_url
+      SECRET_ID           = var.merged_mysql_secret_name
     },
+    var.mysql_jdbc_driver_class_name != "" ? {
+      JDBC_DRIVER_CLASS_NAME = var.mysql_jdbc_driver_class_name
+    } : {},
     var.mysql_jdbc_driver_jar_uri != "" ? {
       JDBC_DRIVER_JAR_URI = var.mysql_jdbc_driver_jar_uri
     } : {}

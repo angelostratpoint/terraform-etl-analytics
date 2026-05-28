@@ -133,9 +133,10 @@ cdcu/{environment}/merged-mysql-connection
 The active Glue source connection is `cdcu-{environment}-merged-mysql`.
 Terraform no longer provisions separate Microsite and Legacy Glue source
 connections because BPI-MS consolidated the source into one RDS database.
-The Glue connection uses the current MySQL driver class
-`com.mysql.cj.jdbc.Driver`; a custom JDBC driver JAR can be supplied through
-`mysql_jdbc_driver_jar_uri` only when BPI-MS provides an approved S3 URI.
+By default the Glue connection uses the Glue-provided MySQL driver so the
+Glue console connection test remains supported. Set `mysql_jdbc_driver_class_name`
+or `mysql_jdbc_driver_jar_uri` only when BPI-MS provides an approved custom
+driver configuration.
 
 Terraform references the secret names only. Secret values, password rotation
 material, and database credentials must remain outside Terraform state.

@@ -69,9 +69,9 @@ variable "merged_mysql_secret_name" {
 }
 
 variable "mysql_jdbc_driver_class_name" {
-  description = "MySQL JDBC driver class name used by the Glue connection."
+  description = "Optional MySQL JDBC driver class name for custom driver scenarios. Leave blank to use the Glue-provided MySQL driver and support Glue connection tests."
   type        = string
-  default     = "com.mysql.cj.jdbc.Driver"
+  default     = ""
 }
 
 variable "mysql_jdbc_driver_jar_uri" {

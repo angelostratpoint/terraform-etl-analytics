@@ -66,11 +66,13 @@ module "glue" {
   glue_security_group_ids = [var.existing_security_group_id]
   subnet_id               = var.subnet_id
   availability_zone       = var.availability_zone
-  glue_worker_count       = var.glue_worker_count
-  glue_worker_type        = var.glue_worker_type
-  merged_jdbc_url          = var.merged_jdbc_url
-  merged_mysql_secret_name = var.merged_mysql_secret_name
-  tags                     = local.common_tags
+  glue_worker_count            = var.glue_worker_count
+  glue_worker_type             = var.glue_worker_type
+  merged_jdbc_url              = var.merged_jdbc_url
+  merged_mysql_secret_name     = var.merged_mysql_secret_name
+  mysql_jdbc_driver_class_name = var.mysql_jdbc_driver_class_name
+  mysql_jdbc_driver_jar_uri    = var.mysql_jdbc_driver_jar_uri
+  tags                         = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]
 }

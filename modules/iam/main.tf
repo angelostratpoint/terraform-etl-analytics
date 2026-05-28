@@ -8,12 +8,13 @@ locals {
   secret_prefix              = "cdcu/${local.env}/"
   glue_catalog_database_name = "cdcu_${replace(local.env, "-", "_")}_catalog"
 
-  glue_catalog_arn    = "arn:aws:glue:${local.region}:${local.account_id}:catalog"
-  glue_database_arn   = "arn:aws:glue:${local.region}:${local.account_id}:database/${local.glue_catalog_database_name}"
-  glue_table_arn      = "arn:aws:glue:${local.region}:${local.account_id}:table/${local.glue_catalog_database_name}/*"
-  glue_crawler_arn    = "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-*"
-  glue_job_arn        = "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-*"
-  glue_connection_arn = "arn:aws:glue:${local.region}:${local.account_id}:connection/cdcu-*"
+  glue_catalog_arn       = "arn:aws:glue:${local.region}:${local.account_id}:catalog"
+  glue_database_arn      = "arn:aws:glue:${local.region}:${local.account_id}:database/${local.glue_catalog_database_name}"
+  glue_table_arn         = "arn:aws:glue:${local.region}:${local.account_id}:table/${local.glue_catalog_database_name}/*"
+  glue_crawler_arn       = "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-*"
+  glue_job_arn           = "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-*"
+  glue_connection_arn    = "arn:aws:glue:${local.region}:${local.account_id}:connection/cdcu-*"
+  glue_assets_bucket_arn = "arn:aws:s3:::aws-glue-assets-${local.account_id}-${local.region}"
 
   sagemaker_processing_job_arn  = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-*"
   sagemaker_training_job_arn    = "arn:aws:sagemaker:${local.region}:${local.account_id}:training-job/cdcu-*"
@@ -116,6 +117,22 @@ resource "aws_iam_policy" "glue_s3" {
           "s3:GetBucketVersioning"
         ]
         Resource = var.data_lake_bucket_arn
+      },
+      {
+        Sid    = "S3GlueAssetsBucketReadAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = local.glue_assets_bucket_arn
+      },
+      {
+        Sid    = "S3GlueAssetsObjectReadAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "${local.glue_assets_bucket_arn}/*"
       }
     ]
   })

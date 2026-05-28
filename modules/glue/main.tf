@@ -2,6 +2,19 @@ data "aws_secretsmanager_secret" "merged_mysql_connection" {
   name = var.merged_mysql_secret_name
 }
 
+locals {
+  mysql_jdbc_connection_properties = merge(
+    {
+      JDBC_CONNECTION_URL    = var.merged_jdbc_url
+      SECRET_ID              = var.merged_mysql_secret_name
+      JDBC_DRIVER_CLASS_NAME = var.mysql_jdbc_driver_class_name
+    },
+    var.mysql_jdbc_driver_jar_uri != "" ? {
+      JDBC_DRIVER_JAR_URI = var.mysql_jdbc_driver_jar_uri
+    } : {}
+  )
+}
+
 resource "aws_glue_catalog_database" "cdcu" {
   name        = "cdcu_${replace(var.environment, "-", "_")}_catalog"
   description = "CDCU ${var.environment} Glue Data Catalog database"
@@ -12,10 +25,7 @@ resource "aws_glue_connection" "merged_mysql" {
   description     = "JDBC connection to the merged CDCU MySQL source database"
   connection_type = "JDBC"
 
-  connection_properties = {
-    JDBC_CONNECTION_URL = var.merged_jdbc_url
-    SECRET_ID           = var.merged_mysql_secret_name
-  }
+  connection_properties = local.mysql_jdbc_connection_properties
 
   physical_connection_requirements {
     availability_zone      = var.availability_zone

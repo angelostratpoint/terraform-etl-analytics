@@ -178,11 +178,17 @@ populate and rotate the secret values through the approved secure process.
 The merged JDBC URL must point to the real RDS endpoint:
 
 ```hcl
-merged_jdbc_url          = "jdbc:mysql://<rds-endpoint>:3306/<database>"
-merged_mysql_secret_name = "cdcu/<environment>/merged-mysql-connection"
+merged_jdbc_url              = "jdbc:mysql://<rds-endpoint>:3306/<database>?useSSL=false&allowPublicKeyRetrieval=true"
+merged_mysql_secret_name     = "cdcu/<environment>/merged-mysql-connection"
+mysql_jdbc_driver_class_name = "com.mysql.cj.jdbc.Driver"
+mysql_jdbc_driver_jar_uri    = ""
 ```
 
 The variables reject `localhost` values to avoid deploying test placeholders.
+`mysql_jdbc_driver_class_name` is set to the current MySQL Connector/J class
+name to avoid the deprecated `com.mysql.jdbc.Driver` warning in Glue logs. Use
+`mysql_jdbc_driver_jar_uri` only if BPI-MS provides an approved custom JDBC
+driver JAR in S3.
 
 ## Lake Formation
 

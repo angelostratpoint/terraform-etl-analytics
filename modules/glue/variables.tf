@@ -68,6 +68,23 @@ variable "merged_mysql_secret_name" {
   }
 }
 
+variable "mysql_jdbc_driver_class_name" {
+  description = "MySQL JDBC driver class name used by the Glue connection."
+  type        = string
+  default     = "com.mysql.cj.jdbc.Driver"
+}
+
+variable "mysql_jdbc_driver_jar_uri" {
+  description = "Optional S3 URI for a custom MySQL JDBC driver JAR. Leave blank to use the Glue-provided driver."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.mysql_jdbc_driver_jar_uri == "" || startswith(var.mysql_jdbc_driver_jar_uri, "s3://")
+    error_message = "mysql_jdbc_driver_jar_uri must be blank or an s3:// URI."
+  }
+}
+
 variable "tags" {
   description = "Common resource tags"
   type        = map(string)

@@ -26,8 +26,8 @@ resource "terraform_data" "manual_baseline_contract" {
     }
 
     precondition {
-      condition     = var.merged_jdbc_url != "" || (var.microsite_jdbc_url != "" && var.legacy_jdbc_url != "")
-      error_message = "Provide merged_jdbc_url for the shared BPI MS source database, or provide both microsite_jdbc_url and legacy_jdbc_url for separate source databases."
+      condition     = var.merged_jdbc_url != "" && var.merged_mysql_secret_name != ""
+      error_message = "merged_jdbc_url and merged_mysql_secret_name are required for the shared BPI MS source database."
     }
   }
 }
@@ -68,8 +68,6 @@ module "glue" {
   availability_zone       = var.availability_zone
   glue_worker_count       = var.glue_worker_count
   glue_worker_type        = var.glue_worker_type
-  microsite_jdbc_url       = var.microsite_jdbc_url
-  legacy_jdbc_url          = var.legacy_jdbc_url
   merged_jdbc_url          = var.merged_jdbc_url
   merged_mysql_secret_name = var.merged_mysql_secret_name
   tags                     = local.common_tags

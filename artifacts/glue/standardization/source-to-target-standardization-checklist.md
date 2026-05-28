@@ -14,10 +14,8 @@ s3://cdcu-{env}-data-lake/
 Terraform currently creates these data prefixes:
 
 ```text
-s3://cdcu-{env}-data-lake/raw/microsite/
-s3://cdcu-{env}-data-lake/raw/legacy/
-s3://cdcu-{env}-data-lake/standardized/microsite/
-s3://cdcu-{env}-data-lake/standardized/legacy/
+s3://cdcu-{env}-data-lake/raw/merged/
+s3://cdcu-{env}-data-lake/standardized/merged/
 s3://cdcu-{env}-data-lake/processed/matching/merge/
 s3://cdcu-{env}-data-lake/processed/matching/unique/
 s3://cdcu-{env}-data-lake/processed/matching/manual_review/
@@ -31,8 +29,7 @@ Terraform, such as `--SOURCE_S3_PATH` and `--TARGET_S3_PATH`.
 DA/DE should provide these files before standardization jobs are run:
 
 ```text
-artifacts/glue/standardization/microsite_standardization.py
-artifacts/glue/standardization/legacy_standardization.py
+artifacts/glue/standardization/merged_standardization.py
 ```
 
 Terraform uploads these files to:
@@ -54,7 +51,7 @@ s3://cdcu-{env}-data-lake/{env}/glue-scripts/standardization/
 | Mobile Number | Remove spaces, dashes, parentheses, and symbols; standardize to local PH format or agreed format. |
 | Telephone Home | Remove spaces/symbols, standardize number format, allow null if not available. |
 | Telephone Office | Remove spaces/symbols, standardize number format, allow null if not available. |
-| Source System Identifier | Populate as `Legacy` or `Microsite` depending on the source dataset. |
+| Source System Identifier | Populate from the merged source table, if the source system identifier is available. |
 
 ## Output Expectations
 
@@ -64,7 +61,7 @@ prefixes in Parquet unless DA/DE and BPI MS approve another format.
 Recommended output behavior:
 
 - Preserve source record identifiers required for reconciliation.
-- Add or preserve `source_system` with values `Legacy` or `Microsite`.
+- Add or preserve `source_system` when the merged source table provides it.
 - Keep postal codes and client numbers as strings when leading zeroes may matter.
 - Write invalid or rejected records to an agreed error/reconciliation location.
 - Avoid logging raw PII values in Glue logs.

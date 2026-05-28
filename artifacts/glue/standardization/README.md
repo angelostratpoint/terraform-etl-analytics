@@ -6,8 +6,7 @@ This directory contains AWS Glue ETL scripts for the **standardization phase** o
 
 | File | Description |
 |------|-------------|
-| `microsite_standardization.py` | Reads raw Microsite data from S3, applies cleaning rules, and writes Parquet to `s3://.../standardized/microsite/` |
-| `legacy_standardization.py` | Reads raw Legacy data from S3, applies cleaning rules, and writes Parquet to `s3://.../standardized/legacy/` |
+| `merged_standardization.py` | Reads merged raw source data from S3, applies cleaning rules, and writes Parquet to `s3://.../standardized/merged/` |
 
 See `source-to-target-standardization-checklist.md` for the DA/DE-owned source-to-target
 cleanup checklist and the Terraform-provisioned data lake prefixes.
@@ -19,7 +18,7 @@ cleanup checklist and the Terraform-provisioned data lake prefixes.
 ## Naming Convention
 
 Use lowercase with underscores: `{source}_standardization.py`
-Example: `microsite_standardization.py`
+Example: `merged_standardization.py`
 
 ## S3 Upload Path
 

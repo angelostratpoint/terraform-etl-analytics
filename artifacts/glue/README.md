@@ -6,10 +6,8 @@ Place all AWS Glue ETL scripts here. Scripts are automatically uploaded to S3 du
 
 Based on the Glue jobs defined in `modules/glue/main.tf`, you should create:
 
-1. **microsite_raw_extraction.py** — Extracts raw customer data from Microsite MySQL
-2. **legacy_raw_extraction.py** — Extracts raw customer data from Legacy MySQL
-3. **microsite_standardization.py** — Standardizes Microsite raw data to Parquet
-4. **legacy_standardization.py** — Standardizes Legacy raw data to Parquet
+1. **merged_raw_extraction.py** - Extracts raw customer data from the merged MySQL source.
+2. **merged_standardization.py** - Standardizes merged raw data to Parquet.
 
 ## Script Template
 
@@ -44,4 +42,4 @@ job.commit()
 
 Scripts are uploaded to: `s3://cdcu-{env}-data-lake/{env}/glue-scripts/`
 
-Glue jobs reference them via the `script_location` parameter in `modules/glue/main.tf`.
+Glue jobs reference them through the `script_location` parameter in `modules/glue/main.tf`.

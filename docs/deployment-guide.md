@@ -29,7 +29,7 @@ The Terraform implementation uses these CDCU naming patterns:
 | Resource area | Pattern | Example |
 |---|---|---|
 | AWS service resources | `cdcu-{env}-*` with approved suffixes when required | `cdcu-sit-data-lake-apse1` |
-| Secrets Manager paths | `cdcu/{env}/*` | `cdcu/sit/microsite-mysql-connection` |
+| Secrets Manager paths | `cdcu/{env}/*` | `cdcu/sit/merged-mysql-connection` |
 | Glue catalog database | `cdcu_{env}_catalog` | `cdcu_sit_catalog` |
 | IAM roles, groups, policies | `ST-CDCU-{env}-*` | `ST-CDCU-sit-GlueExecutionRole` |
 | Terraform backend bucket | BPI-MS approved unique name | `cdcu-terraform-state-sit-apse1` |
@@ -52,10 +52,8 @@ target environment:
 | `data_lake_bucket_name` | Approved data lake bucket name, such as `cdcu-sit-data-lake-apse1` |
 | `athena_results_bucket_name` | Approved Athena results bucket name, such as `cdcu-sit-athena-results-apse1` |
 | `existing_kms_key_arn` | BPI-MS KMS key ARN when KMS is enabled |
-| `merged_jdbc_url` | Optional merged MySQL RDS JDBC URL used by both Microsite and Legacy flows |
-| `merged_mysql_secret_name` | Optional merged Secrets Manager secret name, such as `cdcu/sit/merged-mysql-connection` |
-| `microsite_jdbc_url` | Microsite MySQL RDS JDBC URL fallback; keep aligned with `merged_jdbc_url` when using one DB |
-| `legacy_jdbc_url` | Legacy MySQL RDS JDBC URL fallback; keep aligned with `merged_jdbc_url` when using one DB |
+| `merged_jdbc_url` | Merged MySQL RDS JDBC URL used by the CDCU Glue source connection |
+| `merged_mysql_secret_name` | Merged Secrets Manager secret name, such as `cdcu/sit/merged-mysql-connection` |
 | `git_repository_url` | Git repository URL for SageMaker code repository |
 | `quicksight_admin_principal_arn` | Approved QuickSight principal when QuickSight is enabled |
 
@@ -162,23 +160,15 @@ environment. Do not proceed if the account is not correct.
 
 ## Secrets
 
-Glue connections can use one merged BPI-MS MySQL source secret when Microsite
-and Legacy are hosted in the same database:
+Glue uses one merged BPI-MS MySQL source secret:
 
 ```text
 cdcu/{environment}/merged-mysql-connection
 ```
 
-When `merged_jdbc_url` and `merged_mysql_secret_name` are set, both existing
-Microsite and Legacy Glue flows use the merged JDBC URL and secret while keeping
-their separate raw and standardized S3 paths.
-
-The older separate secret names remain supported as a compatibility fallback:
-
-```text
-cdcu/{environment}/microsite-mysql-connection
-cdcu/{environment}/legacy-mysql-connection
-```
+The active Glue source connection is `cdcu-{environment}-merged-mysql`.
+Terraform no longer provisions separate Microsite and Legacy Glue source
+connections because BPI-MS consolidated the source into one RDS database.
 
 Terraform references the approved secret names. Secret values, passwords, and
 rotation material must not be committed to Git and must not be stored in
@@ -190,14 +180,9 @@ The merged JDBC URL must point to the real RDS endpoint:
 ```hcl
 merged_jdbc_url          = "jdbc:mysql://<rds-endpoint>:3306/<database>"
 merged_mysql_secret_name = "cdcu/<environment>/merged-mysql-connection"
-
-microsite_jdbc_url = "jdbc:mysql://<rds-endpoint>:3306/<database>"
-legacy_jdbc_url    = "jdbc:mysql://<rds-endpoint>:3306/<database>"
 ```
 
-The Microsite and Legacy fallback JDBC values should match the merged JDBC URL
-unless BPI-MS returns to separate source databases. The variables reject
-`localhost` values to avoid deploying test placeholders.
+The variables reject `localhost` values to avoid deploying test placeholders.
 
 ## Lake Formation
 
@@ -249,10 +234,8 @@ Required values to review:
 | `sns_topic_arn` | Approved SNS topic ARN, or empty string if unused |
 | `glue_worker_count` | Approved Glue worker count |
 | `glue_worker_type` | Approved Glue worker type |
-| `merged_jdbc_url` | Real merged MySQL RDS JDBC URL, if BPI-MS uses one source DB |
-| `merged_mysql_secret_name` | Real merged Secrets Manager secret name, if BPI-MS uses one source DB |
-| `microsite_jdbc_url` | Real Microsite JDBC fallback; keep aligned with merged URL for one source DB |
-| `legacy_jdbc_url` | Real Legacy JDBC fallback; keep aligned with merged URL for one source DB |
+| `merged_jdbc_url` | Real merged MySQL RDS JDBC URL |
+| `merged_mysql_secret_name` | Real merged Secrets Manager secret name |
 | `git_repository_url` | Approved repository URL for SageMaker code repository |
 | `enable_sagemaker_unified_studio` | Whether to provision SageMaker Studio resources |
 | `sagemaker_studio_user_profile_names` | Approved SageMaker Studio user profile names |

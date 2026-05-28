@@ -29,15 +29,9 @@ athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
 glue_worker_count = 2
 glue_worker_type  = "G.1X"
 
-# BPI-MS merged source DB. When set, both Microsite and Legacy Glue flows use
-# this JDBC URL and secret while preserving separate raw/standardized S3 paths.
+# BPI-MS merged source DB used by the single CDCU Glue JDBC connection.
 merged_jdbc_url          = "jdbc:mysql://merged-rds-endpoint.example.com:3306/cdcu_db"
 merged_mysql_secret_name = "cdcu/sit/merged-mysql-connection"
-
-# Backward-compatible fallback values. Keep aligned with merged_jdbc_url unless
-# BPI-MS reverts to separate Microsite and Legacy source databases.
-microsite_jdbc_url = "jdbc:mysql://merged-rds-endpoint.example.com:3306/cdcu_db"
-legacy_jdbc_url    = "jdbc:mysql://merged-rds-endpoint.example.com:3306/cdcu_db"
 
 git_repository_url = "https://git-codecommit.ap-southeast-1.amazonaws.com/v1/repos/cdcu"
 

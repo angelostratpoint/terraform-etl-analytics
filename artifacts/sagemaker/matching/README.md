@@ -6,18 +6,18 @@ This directory contains Python scripts for the **matching phase** of the CDCU pi
 
 | File | Description |
 |------|-------------|
-| `matching_processor.py` | Main matching logic — compares Microsite and Legacy customer records using string distance and date compute algorithms |
+| `matching_processor.py` | Main matching logic using standardized CDCU customer records, string distance, and date compute algorithms |
 
 ## Matching Phases
 
 The matching engine runs in three phases:
-1. **Phase 1 (MVP)** — Blocking and initial matching using Names, Birthdates, Mobile Numbers, Emails, TINs
-2. **Phase 2 (Tuning)** — Weighted scoring and threshold refinement; classifies records as Merge / Manual Review / Unique
-3. **Phase 3 (Production)** — Scale optimization, error handling, reason codes (e.g., `same_mobile_same_birthdate`)
+1. **Phase 1 (MVP)** - Blocking and initial matching using Names, Birthdates, Mobile Numbers, Emails, TINs
+2. **Phase 2 (Tuning)** - Weighted scoring and threshold refinement; classifies records as Merge / Manual Review / Unique
+3. **Phase 3 (Production)** - Scale optimization, error handling, reason codes (for example, `same_mobile_same_birthdate`)
 
 ## File Type
 
-`*.py` — Python scripts executed as SageMaker Processing Jobs
+`*.py` - Python scripts executed as SageMaker Processing Jobs
 
 ## Naming Convention
 

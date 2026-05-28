@@ -48,33 +48,24 @@ variable "glue_worker_type" {
   default     = "G.1X"
 }
 
-variable "microsite_jdbc_url" {
-  description = "Optional fallback JDBC URL for the Microsite MySQL source database when merged_jdbc_url is not set."
-  type        = string
-  default     = ""
-}
-
-variable "legacy_jdbc_url" {
-  description = "Optional fallback JDBC URL for the Legacy MySQL source database when merged_jdbc_url is not set."
-  type        = string
-  default     = ""
-}
-
 variable "merged_jdbc_url" {
-  description = "Optional merged MySQL JDBC URL used by both Microsite and Legacy flows when BPI-MS provides one shared source database."
+  description = "Merged BPI-MS MySQL JDBC URL used by the CDCU Glue source connection."
   type        = string
-  default     = ""
 
   validation {
-    condition     = var.merged_jdbc_url == "" || (startswith(var.merged_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.merged_jdbc_url))))
-    error_message = "merged_jdbc_url must be blank or a non-local MySQL JDBC URL from BPI-MS."
+    condition     = startswith(var.merged_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.merged_jdbc_url)))
+    error_message = "merged_jdbc_url must be a non-local MySQL JDBC URL from BPI-MS."
   }
 }
 
 variable "merged_mysql_secret_name" {
-  description = "Optional Secrets Manager secret name for the merged MySQL source database. When set, both source Glue connections use this secret."
+  description = "Secrets Manager secret name for the merged BPI-MS MySQL source database."
   type        = string
-  default     = ""
+
+  validation {
+    condition     = var.merged_mysql_secret_name != ""
+    error_message = "merged_mysql_secret_name is required."
+  }
 }
 
 variable "tags" {

@@ -36,16 +36,16 @@ ORDER BY record_count DESC;
 ```sql
 -- validate_record_counts.sql
 SELECT
-  'Microsite Raw' AS source,
+  'Merged Raw' AS source,
   COUNT(*) AS record_count
-FROM cdcu_pre_prod_catalog.microsite_raw
+FROM cdcu_pre_prod_catalog.merged_raw
 
 UNION ALL
 
 SELECT
-  'Microsite Standardized' AS source,
+  'Merged Standardized' AS source,
   COUNT(*) AS record_count
-FROM cdcu_pre_prod_catalog.microsite_standardized;
+FROM cdcu_pre_prod_catalog.merged_standardized;
 ```
 
 ## Running SQL Files
@@ -61,9 +61,8 @@ SQL files are uploaded to: `s3://cdcu-{env}-data-lake/{env}/sql/`
 
 ## Note on Named Queries
 
-The `modules/athena/main.tf` already provisions 3 named queries:
-- `validate_microsite_count`
-- `validate_legacy_count`
+The `modules/athena/main.tf` already provisions 2 named queries:
+- `validate_merged_count`
 - `matching_summary`
 
 Additional SQL files here are for custom queries not defined in Terraform.

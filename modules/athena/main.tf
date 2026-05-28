@@ -24,9 +24,9 @@ resource "aws_athena_workgroup" "cdcu" {
   })
 }
 
-resource "aws_athena_named_query" "validate_microsite_count" {
-  name        = "cdcu-${var.environment}-validate-microsite-count"
-  description = "Validates record count in Microsite standardized table"
+resource "aws_athena_named_query" "validate_merged_count" {
+  name        = "cdcu-${var.environment}-validate-merged-count"
+  description = "Validates record count in merged standardized table"
   workgroup   = aws_athena_workgroup.cdcu.name
   database    = var.glue_catalog_database
 
@@ -37,24 +37,7 @@ resource "aws_athena_named_query" "validate_microsite_count" {
       COUNT(CASE WHEN first_name IS NULL THEN 1 END) AS null_first_name,
       COUNT(CASE WHEN birth_date IS NULL THEN 1 END) AS null_birth_date,
       COUNT(CASE WHEN tin IS NULL THEN 1 END) AS null_tin
-    FROM cdcu_${replace(var.environment, "-", "_")}_catalog.microsite_standardized
-  SQL
-}
-
-resource "aws_athena_named_query" "validate_legacy_count" {
-  name        = "cdcu-${var.environment}-validate-legacy-count"
-  description = "Validates record count in Legacy standardized table"
-  workgroup   = aws_athena_workgroup.cdcu.name
-  database    = var.glue_catalog_database
-
-  query = <<-SQL
-    SELECT
-      COUNT(*) AS total_records,
-      COUNT(CASE WHEN last_name IS NULL THEN 1 END) AS null_last_name,
-      COUNT(CASE WHEN first_name IS NULL THEN 1 END) AS null_first_name,
-      COUNT(CASE WHEN birth_date IS NULL THEN 1 END) AS null_birth_date,
-      COUNT(CASE WHEN tin IS NULL THEN 1 END) AS null_tin
-    FROM cdcu_${replace(var.environment, "-", "_")}_catalog.legacy_standardized
+    FROM cdcu_${replace(var.environment, "-", "_")}_catalog.merged_standardized
   SQL
 }
 

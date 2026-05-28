@@ -6,8 +6,7 @@ This directory contains AWS Glue ETL scripts for the **raw extraction phase** of
 
 | File | Description |
 |------|-------------|
-| `microsite_raw_extraction.py` | Extracts raw customer data from the Microsite MySQL RDS source into `s3://.../raw/microsite/` |
-| `legacy_raw_extraction.py` | Extracts raw customer data from the Legacy MySQL RDS source into `s3://.../raw/legacy/` |
+| `merged_raw_extraction.py` | Extracts raw customer data from the merged MySQL RDS source into `s3://.../raw/merged/` |
 
 ## File Type
 
@@ -16,7 +15,7 @@ This directory contains AWS Glue ETL scripts for the **raw extraction phase** of
 ## Naming Convention
 
 Use lowercase with underscores: `{source}_{phase}.py`
-Example: `microsite_raw_extraction.py`
+Example: `merged_raw_extraction.py`
 
 ## S3 Upload Path
 

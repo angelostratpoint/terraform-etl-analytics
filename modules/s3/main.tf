@@ -153,10 +153,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
 locals {
   # S3 has no real folders; zero-byte objects create visible prefixes in the console.
   folder_prefixes = [
-    "raw/microsite/",
-    "raw/legacy/",
-    "standardized/microsite/",
-    "standardized/legacy/",
+    "raw/merged/",
+    "standardized/merged/",
     "processed/matching/merge/",
     "processed/matching/unique/",
     "processed/matching/manual_review/",

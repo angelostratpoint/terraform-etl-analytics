@@ -130,7 +130,9 @@ resource "aws_iam_policy" "glue_s3" {
         Sid    = "S3GlueAssetsObjectReadAccess"
         Effect = "Allow"
         Action = [
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = "${local.glue_assets_bucket_arn}/*"
       }
@@ -153,7 +155,7 @@ resource "aws_iam_policy" "glue_etl" {
           "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
           "glue:GetTable", "glue:GetTables", "glue:SearchTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
           "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
-          "glue:BatchGetPartition"
+          "glue:BatchGetPartition", "glue:GetCatalogImportStatus"
         ]
         Resource = [
           local.glue_catalog_arn,
@@ -166,37 +168,33 @@ resource "aws_iam_policy" "glue_etl" {
         Effect = "Allow"
         Action = [
           "glue:CreateCrawler", "glue:UpdateCrawler", "glue:DeleteCrawler",
-          "glue:GetCrawler", "glue:StartCrawler", "glue:StopCrawler"
+          "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler"
         ]
-        Resource = local.glue_crawler_arn
+        Resource = [
+          local.glue_crawler_arn,
+          "*"
+        ]
       },
       {
         Sid    = "GlueJobAccess"
         Effect = "Allow"
         Action = [
           "glue:CreateJob", "glue:UpdateJob", "glue:DeleteJob",
-          "glue:GetJob", "glue:StartJobRun",
+          "glue:GetJob", "glue:GetJobs", "glue:StartJobRun",
           "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun"
         ]
-        Resource = local.glue_job_arn
+        Resource = [
+          local.glue_job_arn,
+          "*"
+        ]
       },
       {
         Sid    = "GlueConnectionAccess"
         Effect = "Allow"
         Action = [
-          "glue:GetConnection", "glue:CreateConnection", "glue:UpdateConnection",
-          "glue:DeleteConnection"
-        ]
-        Resource = local.glue_connection_arn
-      },
-      {
-        Sid    = "GlueListAndSecurityConfigurationRead"
-        Effect = "Allow"
-        Action = [
-          "glue:GetCrawlers",
-          "glue:GetJobs",
-          "glue:GetConnections",
-          "glue:GetSecurityConfiguration"
+          "glue:GetConnection", "glue:GetConnections", "glue:CreateConnection", "glue:UpdateConnection",
+          "glue:DeleteConnection", "glue:GetSecurityConfiguration", "glue:GetSecurityConfigurations",
+          "glue:GetTags"
         ]
         Resource = "*"
       },
@@ -211,7 +209,8 @@ resource "aws_iam_policy" "glue_etl" {
           "ec2:DescribeRouteTables",
           "ec2:CreateNetworkInterface",
           "ec2:DeleteNetworkInterface",
-          "ec2:DescribeNetworkInterfaces"
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:CreateTags"
         ]
         Resource = "*"
       }
@@ -277,6 +276,27 @@ resource "aws_iam_policy" "glue_cloudwatch" {
   tags = var.tags
 }
 
+resource "aws_iam_policy" "glue_kms" {
+  name = "ST-CDCU-${local.env}-GlueKMSDecrypt"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "KMSDecryptForGlueConnections"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
 resource "aws_iam_role_policy_attachment" "glue_s3" {
   role       = aws_iam_role.glue_execution.name
   policy_arn = aws_iam_policy.glue_s3.arn
@@ -295,6 +315,11 @@ resource "aws_iam_role_policy_attachment" "glue_secrets" {
 resource "aws_iam_role_policy_attachment" "glue_cloudwatch" {
   role       = aws_iam_role.glue_execution.name
   policy_arn = aws_iam_policy.glue_cloudwatch.arn
+}
+
+resource "aws_iam_role_policy_attachment" "glue_kms" {
+  role       = aws_iam_role.glue_execution.name
+  policy_arn = aws_iam_policy.glue_kms.arn
 }
 
 resource "aws_iam_role_policy_attachment" "glue_deny" {
@@ -482,6 +507,11 @@ resource "aws_iam_role_policy_attachment" "sagemaker_amazon_q" {
   policy_arn = aws_iam_policy.sagemaker_amazon_q.arn
 }
 
+resource "aws_iam_role_policy_attachment" "sagemaker_athena" {
+  role       = aws_iam_role.sagemaker_execution.name
+  policy_arn = aws_iam_policy.athena_access.arn
+}
+
 resource "aws_iam_role_policy_attachment" "sagemaker_deny" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = aws_iam_policy.deny_sensitive.arn
@@ -514,18 +544,38 @@ resource "aws_iam_policy" "athena_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AthenaAccess"
+        Sid    = "AthenaWorkgroupQueryAccess"
         Effect = "Allow"
         Action = [
+          "athena:BatchGetQueryExecution",
           "athena:StartQueryExecution",
           "athena:GetQueryExecution",
           "athena:GetQueryResults",
           "athena:StopQueryExecution",
           "athena:ListQueryExecutions",
-          "athena:GetWorkGroup",
-          "athena:ListWorkGroups"
+          "athena:GetWorkGroup"
         ]
         Resource = "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${var.athena_workgroup_name}"
+      },
+      {
+        Sid    = "AthenaConsoleDiscoveryAccess"
+        Effect = "Allow"
+        Action = [
+          "athena:ListWorkGroups",
+          "athena:ListDataCatalogs"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AthenaDataCatalogAccess"
+        Effect = "Allow"
+        Action = [
+          "athena:GetDataCatalog",
+          "athena:GetTableMetadata",
+          "athena:ListDatabases",
+          "athena:ListTableMetadata"
+        ]
+        Resource = "arn:aws:athena:${local.region}:${local.account_id}:datacatalog/AwsDataCatalog"
       },
       {
         Sid    = "AthenaResultsAccess"

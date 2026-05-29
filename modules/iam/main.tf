@@ -160,7 +160,11 @@ resource "aws_iam_policy" "glue_etl" {
         Resource = [
           local.glue_catalog_arn,
           local.glue_database_arn,
-          local.glue_table_arn
+          local.glue_table_arn,
+          # Allow access to the default database so DE scripts using
+          # from_catalog(database="default") do not get AccessDeniedException.
+          "arn:aws:glue:${local.region}:${local.account_id}:database/default",
+          "arn:aws:glue:${local.region}:${local.account_id}:table/default/*"
         ]
       },
       {
@@ -168,7 +172,8 @@ resource "aws_iam_policy" "glue_etl" {
         Effect = "Allow"
         Action = [
           "glue:CreateCrawler", "glue:UpdateCrawler", "glue:DeleteCrawler",
-          "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler"
+          "glue:GetCrawler", "glue:GetCrawlers", "glue:StartCrawler", "glue:StopCrawler",
+          "glue:GetTags", "glue:TagResource", "glue:UntagResource"
         ]
         Resource = [
           local.glue_crawler_arn,
@@ -180,8 +185,10 @@ resource "aws_iam_policy" "glue_etl" {
         Effect = "Allow"
         Action = [
           "glue:CreateJob", "glue:UpdateJob", "glue:DeleteJob",
-          "glue:GetJob", "glue:GetJobs", "glue:StartJobRun",
-          "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun"
+          "glue:GetJob", "glue:GetJobs", "glue:BatchGetJobs",
+          "glue:StartJobRun", "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun",
+          "glue:GetJobBookmark", "glue:ResetJobBookmark",
+          "glue:GetTags", "glue:TagResource", "glue:UntagResource"
         ]
         Resource = [
           local.glue_job_arn,
@@ -195,6 +202,25 @@ resource "aws_iam_policy" "glue_etl" {
           "glue:GetConnection", "glue:GetConnections", "glue:CreateConnection", "glue:UpdateConnection",
           "glue:DeleteConnection", "glue:GetSecurityConfiguration", "glue:GetSecurityConfigurations",
           "glue:GetTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "GlueStudioScriptAndVisualEditor"
+        Effect = "Allow"
+        Action = [
+          "glue:CreateScript", "glue:GetScript", "glue:GetDataflowGraph"
+        ]
+        Resource = "*"
+      },
+      {
+        # AWS does not support resource-level restrictions for these actions.
+        Sid    = "GlueStudioConsoleWildcard"
+        Effect = "Allow"
+        Action = [
+          "glue:GetCrawlerMetrics",
+          "glue:ListSchemas", "glue:GetRegistry", "glue:ListRegistries",
+          "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"
         ]
         Resource = "*"
       },
@@ -902,7 +928,10 @@ resource "aws_iam_policy" "de_cloudwatch" {
       {
         Sid    = "CloudWatchLogsRead"
         Effect = "Allow"
-        Action = ["logs:GetLogEvents"]
+        Action = [
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents"
+        ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*:log-stream:*",
@@ -919,6 +948,67 @@ resource "aws_iam_policy" "de_cloudwatch" {
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
         ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "de_glue_passrole" {
+  name = "ST-CDCU-${local.env}-DEGluePassRole"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowOnlyApprovedGlueExecutionRoles"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "glue.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid    = "GlueExecutionRoleRead"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:ListRoles",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListRolePolicies"
+        ]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole"
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "de_glue_console" {
+  name = "ST-CDCU-${local.env}-DEGlueConsoleAccess"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "GlueStudioS3BucketDiscovery"
+        Effect = "Allow"
+        Action = [
+          "s3:ListAllMyBuckets",
+          "s3:GetBucketLocation"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "GlueStudioIAMRoleDiscovery"
+        Effect = "Allow"
+        Action = ["iam:ListRoles"]
         Resource = "*"
       }
     ]
@@ -960,6 +1050,16 @@ resource "aws_iam_group_policy_attachment" "de_secrets" {
 resource "aws_iam_group_policy_attachment" "de_cloudwatch" {
   group      = aws_iam_group.data_engineering.name
   policy_arn = aws_iam_policy.de_cloudwatch.arn
+}
+
+resource "aws_iam_group_policy_attachment" "de_glue_passrole" {
+  group      = aws_iam_group.data_engineering.name
+  policy_arn = aws_iam_policy.de_glue_passrole.arn
+}
+
+resource "aws_iam_group_policy_attachment" "de_glue_console" {
+  group      = aws_iam_group.data_engineering.name
+  policy_arn = aws_iam_policy.de_glue_console.arn
 }
 
 resource "aws_iam_group_policy_attachment" "de_deny" {

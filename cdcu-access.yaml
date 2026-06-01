@@ -385,6 +385,8 @@ Resources:
               - s3:PutObject
               - s3:ListBucket
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1/*"
 
@@ -447,6 +449,8 @@ Resources:
               - s3:PutObject
               - s3:ListBucket
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1/*"
 
@@ -525,6 +529,8 @@ Resources:
               - s3:PutObject
               - s3:ListBucket
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1/*"
 
@@ -614,6 +620,8 @@ Resources:
               - s3:ListBucket
               - s3:ListBucketMultipartUploads
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
 
@@ -627,6 +635,8 @@ Resources:
               - s3:ListMultipartUploadParts
               - s3:PutObject
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
 
@@ -953,10 +963,18 @@ Resources:
           - Sid: S3CDCUBucketReadMetadata
             Effect: Allow
             Action:
+              - s3:GetBucketAcl
               - s3:GetBucketLocation
+              - s3:GetBucketNotification
+              - s3:GetBucketPolicyStatus
+              - s3:GetBucketPublicAccessBlock
+              - s3:GetBucketTagging
+              - s3:GetBucketVersioning
               - s3:ListBucket
               - s3:ListBucketMultipartUploads
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
 
@@ -966,10 +984,14 @@ Resources:
               - s3:AbortMultipartUpload
               - s3:DeleteObject
               - s3:GetObject
+              - s3:GetObjectAcl
+              - s3:GetObjectTagging
               - s3:GetObjectVersion
               - s3:ListMultipartUploadParts
               - s3:PutObject
             Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
 
@@ -1124,12 +1146,14 @@ Resources:
                 - glue:ListCrawlers
                 - glue:ListDatabases
                 - glue:ListJobs
+                - s3:GetAccountPublicAccessBlock
                 - kms:DescribeKey
                 - kms:ListAliases
                 - rds:DescribeDBClusters
                 - rds:DescribeDBInstances
                 - rds:DescribeDBSubnetGroups
                 - s3:GetBucketLocation
+                - s3:ListAccessPoints
                 - s3:ListAllMyBuckets
                 - tag:GetResources
               Resource: "*"

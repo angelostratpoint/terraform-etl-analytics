@@ -5,15 +5,15 @@ Place all Athena SQL files here. Scripts are automatically uploaded to S3 during
 ## Purpose
 
 SQL files define:
-- **Views** — reusable query logic for reporting
-- **Validation queries** — data quality checks
-- **Aggregation queries** — summary statistics for QuickSight dashboards
+- **Views** - reusable query logic for reporting
+- **Validation queries** - data quality checks
+- **Aggregation queries** - summary statistics for QuickSight dashboards
 
 ## Expected SQL Files
 
-1. **create_matching_summary_view.sql** — View summarizing match results by status
-2. **validate_record_counts.sql** — Validation query comparing source vs. processed counts
-3. **quality_metrics.sql** — Data quality metrics (null rates, duplicate counts, etc.)
+1. **create_matching_summary_view.sql** - View summarizing match results by status
+2. **validate_record_counts.sql** - Validation query comparing source vs. processed counts
+3. **quality_metrics.sql** - Data quality metrics such as null rates, duplicate counts, and category totals
 
 ## Example: Create View
 
@@ -26,10 +26,12 @@ SELECT
   AVG(match_score) AS avg_score,
   MIN(match_score) AS min_score,
   MAX(match_score) AS max_score
-FROM cdcu_pre_prod_catalog.processed_matching
+FROM cdcu_sit_catalog.processed_matching
 GROUP BY match_status
 ORDER BY record_count DESC;
 ```
+
+For UAT and Prod, replace `cdcu_sit_catalog` with the matching environment catalog, such as `cdcu_uat_catalog`.
 
 ## Example: Validation Query
 
@@ -38,22 +40,22 @@ ORDER BY record_count DESC;
 SELECT
   'Merged Raw' AS source,
   COUNT(*) AS record_count
-FROM cdcu_pre_prod_catalog.merged_raw
+FROM cdcu_sit_catalog.merged_raw
 
 UNION ALL
 
 SELECT
   'Merged Standardized' AS source,
   COUNT(*) AS record_count
-FROM cdcu_pre_prod_catalog.merged_standardized;
+FROM cdcu_sit_catalog.merged_standardized;
 ```
 
 ## Running SQL Files
 
 SQL files are uploaded to S3 but must be executed manually via:
-- **Athena console** — copy/paste and run
-- **AWS CLI** — `aws athena start-query-execution --query-string "$(cat query.sql)"`
-- **QuickSight** — reference views in dataset definitions
+- **Athena console** - copy/paste and run
+- **AWS CLI** - `aws athena start-query-execution --query-string "$(cat query.sql)"`
+- **QuickSight** - reference views in dataset definitions
 
 ## S3 Upload Path
 

@@ -23,8 +23,8 @@ sso_principal_arns = []
 enable_kms    = false
 sns_topic_arn = ""
 
-data_lake_bucket_name      = "cdcu-uat-data-lake-apse1"
-athena_results_bucket_name = "cdcu-uat-athena-results-apse1"
+data_lake_bucket_name      = "cdcu-uat-data-lake"
+athena_results_bucket_name = "cdcu-uat-athena-results"
 
 glue_worker_count = 2
 glue_worker_type  = "G.1X"

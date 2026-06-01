@@ -35,8 +35,8 @@ SageMaker Processing Jobs are invoked via AWS CLI or console:
 
 ```bash
 aws sagemaker create-processing-job \
-  --processing-job-name cdcu-matching-job \
-  --role-arn arn:aws:iam::ACCOUNT:role/cdcu-sit-sagemaker-execution-role \
+  --processing-job-name cdcu-sit-matching-job \
+  --role-arn arn:aws:iam::ACCOUNT:role/ST-CDCU-sit-SageMakerExecutionRole \
   --app-specification ImageUri=683313688378.dkr.ecr.ap-southeast-1.amazonaws.com/sagemaker-scikit-learn:1.0-1-cpu-py3,ContainerEntrypoint=python3,ContainerArguments=/opt/ml/processing/input/code/matching_processor.py,--input-path,s3://bucket/standardized/,--output-path,s3://bucket/processed/ \
   --processing-inputs SourceUri=s3://cdcu-sit-data-lake/sit/sagemaker-scripts/matching_processor.py,Destination=/opt/ml/processing/input/code \
   --processing-outputs SourceUri=/opt/ml/processing/output,Destination=s3://cdcu-sit-data-lake/processed/matching/
@@ -46,6 +46,6 @@ aws sagemaker create-processing-job \
 
 Scripts are uploaded to: `s3://cdcu-{env}-data-lake/{env}/sagemaker-scripts/`
 
-## Note on SageMaker Unified Studio
+## Note on SageMaker Studio
 
-This repository does NOT provision a SageMaker Unified Studio domain. The CDCU workload uses lightweight Processing Jobs invoked on-demand, which do not require a persistent domain or notebook server. This avoids idle costs and VPC complexity.
+This repository provisions a CDCU SageMaker Studio domain, user profile, JupyterLab space, code repository, and optional classic notebook instance when enabled in the environment variables. DE users can run notebooks in Studio for data validation and matching logic, and can invoke SageMaker Processing Jobs on demand for larger matching or data quality workloads.

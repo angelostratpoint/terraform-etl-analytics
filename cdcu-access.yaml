@@ -1399,6 +1399,49 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:policy/sp-*"
                   - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*cdcu*"
+        - PolicyName: CloudEngineerS3ConsoleValidationInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3ConsoleDiscovery
+                Effect: Allow
+                Action:
+                  - s3:GetAccountPublicAccessBlock
+                  - s3:ListAccessPoints
+                  - s3:ListAllMyBuckets
+                Resource: "*"
+
+              - Sid: CDCUBucketMetadataRead
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetBucketNotification
+                  - s3:GetBucketPolicyStatus
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetBucketTagging
+                  - s3:GetBucketVersioning
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
+
+              - Sid: CDCUObjectMetadataRead
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectAcl
+                  - s3:GetObjectTagging
+                  - s3:GetObjectVersion
+                  - s3:ListMultipartUploadParts
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
         # CODEPIPELINE
         - PolicyName: CloudEngineerCodePipelineInlinePolicy
           PolicyDocument:

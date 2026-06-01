@@ -896,8 +896,10 @@ Resources:
             Action:
               - glue:GetConnection
               - glue:GetConnections
+              - glue:TestConnection
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/glue-test-*"
 
           - Sid: GlueVPCRead
             Effect: Allow
@@ -1074,6 +1076,7 @@ Resources:
               - glue:GetConnection
               - glue:GetConnections
               - glue:GetTags
+              - glue:TestConnection
               - glue:UpdateConnection
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"

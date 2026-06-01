@@ -1,0 +1,1816 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: CDCU Access - Optimized
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - sit
+      - uat
+      - prod
+
+  GlueExecutionRoleArn:
+    Type: String
+    Default: ""
+    Description: Optional CDCU Glue execution role ARN for Lake Formation grants.
+
+  AthenaQueryPrincipalArn:
+    Type: String
+    Default: ""
+    Description: Optional IAM user/role ARN used by Athena users for Lake Formation SELECT grants.
+
+  QuickSightPrincipalArn:
+    Type: String
+    Default: ""
+    Description: Optional QuickSight user/group ARN for Lake Formation SELECT grants.
+
+  RegionSuffix:
+    Type: String
+    Default: apse1
+    Description: Regional suffix used by CDCU S3 buckets.
+
+  QuickSightHomeRegion:
+    Type: String
+    Default: us-east-1
+    Description: QuickSight home region for account subscription and QuickSight asset ARNs.
+
+  IncludeGlueStudioScriptPermissions:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Include Glue Studio script generation permissions that require Resource '*'. Requires BPI-MS approval.
+
+  IncludeGlueJobAuthoringPermissions:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Include Glue job authoring role discovery and scoped PassRole permissions. Requires BPI-MS approval.
+
+  IncludeConsoleDiscoveryPermissions:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Include AWS Console discovery/list permissions that require Resource '*'. Requires BPI-MS approval.
+
+  IncludeQuickSightAuthorPermissions:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Include QuickSight author permissions for CDCU dashboard setup. Requires BPI-MS approval.
+
+  IncludeQuickSightBootstrapPolicy:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Create a temporary QuickSight bootstrap policy for account subscription/user registration. Attach manually only during setup.
+
+  IncludeSageMakerAmazonQPermissions:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Include Amazon Q Developer permissions used by SageMaker AI Studio and JupyterLab. Requires BPI-MS approval.
+
+Conditions:
+  HasGlueExecutionRoleArn: !Not [!Equals [!Ref GlueExecutionRoleArn, ""]]
+  HasAthenaQueryPrincipalArn: !Not [!Equals [!Ref AthenaQueryPrincipalArn, ""]]
+  HasQuickSightPrincipalArn: !Not [!Equals [!Ref QuickSightPrincipalArn, ""]]
+  EnableGlueStudioScriptPermissions: !Equals [!Ref IncludeGlueStudioScriptPermissions, "true"]
+  EnableGlueJobAuthoringPermissions: !Equals [!Ref IncludeGlueJobAuthoringPermissions, "true"]
+  EnableConsoleDiscoveryPermissions: !Equals [!Ref IncludeConsoleDiscoveryPermissions, "true"]
+  EnableQuickSightAuthorPermissions: !Equals [!Ref IncludeQuickSightAuthorPermissions, "true"]
+  EnableQuickSightBootstrapPolicy: !Equals [!Ref IncludeQuickSightBootstrapPolicy, "true"]
+  EnableSageMakerAmazonQPermissions: !Equals [!Ref IncludeSageMakerAmazonQPermissions, "true"]
+
+Resources:
+  # Access design notes:
+  # - Keep SageMaker Studio discovery/app actions for DE Studio/JupyterLab use.
+  # - Keep Athena workgroup query/result access and Glue catalog/job/crawler visibility.
+  # - Keep CloudWatch Logs/metrics troubleshooting visibility.
+  # - Keep Lake Formation grants because IAM alone is not enough when LF is enabled.
+  # - Keep Terraform backend access only for Terraform operators and only for
+  #   cdcu-terraform-state-{env} / cdcu-terraform-locks-{env}.
+  # - Include Amazon Q assistant access in the global baseline because BPI-MS and
+  #   Stratpoint expect CE/DE/QA users to use it for CDCU troubleshooting.
+  # - Keep QuickSight for QA and Business Review.
+  # - Avoid broad DynamoDB, broad S3 list-all, broad PassRole, and broad QuickSight admin.
+
+  # GLOBAL SECURITY POLICY
+  CDCUGlobalSecurityPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-global-security-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowChangeOwnPassword
+            Effect: Allow
+            Action:
+              - iam:ChangePassword
+              - iam:GetAccountPasswordPolicy
+              - iam:GetUser
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:user/${!aws:username}"
+
+          - Sid: CloudWatchLogsWriteAccess
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:GetLogEvents
+              - logs:FilterLogEvents
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/*:log-stream:*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/*:log-stream:*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/*:log-stream:*"
+
+          - Sid: CloudWatchLogsDescribe
+            Effect: Allow
+            Action:
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+            Resource: "*"
+
+          - Sid: CloudWatchLogsInsightsQuery
+            Effect: Allow
+            Action:
+              - logs:StartQuery
+              - logs:GetQueryResults
+              - logs:StopQuery
+            Resource: "*"
+
+          - Sid: CloudWatchMetrics
+            Effect: Allow
+            Action:
+              - cloudwatch:GetMetricData
+              - cloudwatch:ListMetrics
+            Resource: "*"
+
+          # AMAZON Q CONSOLE ASSISTANT
+          # Shared for approved CE/DE/QA users as an AWS Console assistant for
+          # troubleshooting and CDCU implementation support. Administrative Q
+          # features remain explicitly denied below.
+          # - Sid: AmazonQConsoleAssistantOnly
+          #   Effect: Allow
+          #   Action:
+          #     - q:SendMessage
+          #     - q:StartConversation
+          #     - q:GetConversation
+          #     - q:ListConversations
+          #     - q:DeleteConversation
+          #   Resource: "*"
+
+          # - Sid: AmazonQQConsolNew
+          #   Effect: Allow
+          #   Action:
+          #     - q:*
+          #     - qdeveloper:*
+          #     - codewhisperer:*
+          #   Resource: "*"
+
+          - Sid: AmazonQConsoleChat
+            Effect: Allow
+            Action:
+              - q:StartConversation
+              - q:SendMessage
+              - q:GetConversation
+              - q:ListConversations
+              - q:DeleteConversation
+              - q:PassRequest
+            Resource: "*"
+
+          - Sid: AllowSTSContextForQ
+            Effect: Allow
+            Action:
+              - sts:SetContext
+            Resource: !Sub "arn:aws:sts::${AWS::AccountId}:self"
+
+          - Sid: ExplicitlyDenyQAdministrativeFunctions
+            Effect: Deny
+            Action:
+              - q:CreateAssignment
+              - q:DeleteAssignment
+              - q:CreatePlugin
+              - q:UpdatePlugin
+              - q:DeletePlugin
+              - q:GetPlugin
+              - q:UsePlugin
+              - q:ListPlugins
+              - q:ListPluginProviders
+              - q:TagResource
+              - q:UntagResource
+              - q:ListTagsForResource
+            Resource: "*"
+
+          - Sid: ExplicitlyDenyCodeGenerationFeatures
+            Effect: Deny
+            Action:
+              - q:GenerateCodeFromCommands
+            Resource: "*"
+
+          - Sid: DenyIAMEscalation
+            Effect: Deny
+            Action:
+              - iam:AttachRolePolicy
+              - iam:PutRolePolicy
+              - iam:CreatePolicy
+              - iam:CreatePolicyVersion
+              - iam:SetDefaultPolicyVersion
+              - iam:UpdateAssumeRolePolicy
+              - iam:CreateRole
+              - iam:AttachUserPolicy
+              - iam:PutUserPolicy
+              - iam:AttachGroupPolicy
+              - iam:PutGroupPolicy
+              - iam:CreateAccessKey
+              - iam:CreateLoginProfile
+              - iam:AddUserToGroup
+            Resource: "*"
+
+          - Sid: DenyNetworking
+            Effect: Deny
+            Action:
+              - ec2:CreateSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:ModifyVpc*
+              - ec2:CreateVpc*
+              - ec2:CreateInternetGateway
+              - ec2:AttachInternetGateway
+              - ec2:CreateRoute
+              - ec2:CreateRouteTable
+            Resource: "*"
+
+          - Sid: DenyCloudFormation
+            Effect: Deny
+            Action:
+              - cloudformation:*
+            Resource: "*"
+
+          - Sid: DenyCloudShell
+            Effect: Deny
+            Action:
+              - cloudshell:*
+            Resource: "*"
+
+          - Sid: DenyOrganizations
+            Effect: Deny
+            Action:
+              - organizations:*
+              - account:*
+            Resource: "*"
+
+          # Terraform/BPI-MS owns Studio domains, profiles, models, endpoints, and pipelines.
+          # Do not deny CreateApp/DeleteApp here because JupyterLab Studio spaces may need
+          # app lifecycle actions for approved DE users to open/stop Studio apps.
+          - Sid: DenyDangerousSageMakerAdministration
+            Effect: Deny
+            Action:
+              - sagemaker:CreateEndpoint
+              - sagemaker:UpdateEndpoint
+              - sagemaker:DeleteEndpoint
+              - sagemaker:DeleteModel
+              - sagemaker:DeletePipeline
+              - sagemaker:CreateNotebookInstance
+              - sagemaker:DeleteNotebookInstance
+              - sagemaker:CreateDomain
+              - sagemaker:DeleteDomain
+              - sagemaker:CreateUserProfile
+              - sagemaker:DeleteUserProfile
+            Resource: "*"
+
+          - Sid: DenyDangerousGlueActions
+            Effect: Deny
+            Action:
+              - glue:DeleteDatabase
+              - glue:DeleteConnection
+              - glue:PutResourcePolicy
+            Resource: "*"
+
+          - Sid: RegionRestriction
+            Effect: Deny
+            NotAction:
+              - iam:*
+              - route53:*
+              - cloudfront:*
+              - support:*
+              - organizations:*
+              - q:*
+              - qdeveloper:*
+              - codewhisperer:*
+              - sagemaker-data-science-assistant:*
+              - quicksight:*
+              - servicecatalog:*
+              - sso:*
+              - identitystore:*
+              - sts:*
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                aws:RequestedRegion: ap-southeast-1
+
+          - Sid: DenyNonCDCURules
+            Effect: Deny
+            Action:
+              - events:PutRule
+              - events:PutTargets
+              - events:DeleteRule
+              - events:RemoveTargets
+            NotResource:
+              - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
+
+  # DEVELOPER POLICY
+  CDCUDeveloperPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-developer-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CodeCommitListRepositories
+            Effect: Allow
+            Action:
+              - codecommit:ListRepositories
+            Resource: "*"
+
+          - Sid: CodeCommitAccess
+            Effect: Allow
+            Action:
+              # Repository metadata
+              - codecommit:GetRepository
+              - codecommit:ListBranches
+
+              # Git operations
+              - codecommit:GitPull
+              - codecommit:GitPush
+
+              # Required internal object access
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetObjectIdentifier
+              - codecommit:GetBlob
+              - codecommit:GetTree
+              - codecommit:BatchGetRepositories
+              - codecommit:BatchGetCommits
+
+              # Push / file editing
+              - codecommit:PutFile
+              - codecommit:CreateCommit
+              - codecommit:UploadArchive
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:CancelUploadArchive
+            Resource:
+              - !Sub "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:cdcu"
+
+          - Sid: S3Access
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1/*"
+
+          - Sid: GlueJobAccess
+            Effect: Allow
+            Action:
+              - glue:StartJobRun
+              - glue:GetJob
+              - glue:GetJobRun
+              - glue:GetJobRuns
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
+
+          - Sid: GlueConnectionAccess
+            Effect: Allow
+            Action:
+              - glue:GetConnection
+              - glue:GetConnections
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
+
+          - Sid: SageMakerProcessing
+            Effect: Allow
+            Action:
+              - sagemaker:CreateProcessingJob
+              - sagemaker:DescribeProcessingJob
+              - sagemaker:StopProcessingJob
+              - sagemaker:ListProcessingJobs
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/cdcu-${Environment}-*"
+
+  # QA VALIDATION POLICY
+  # Merges the original QA and Business Review policies from cdcu-access.yaml.
+  # It supports Athena validation and QuickSight report/dashboard review while
+  # keeping QA/Business Review separated from infrastructure write access.
+  # Based on SIT validation, Athena IAM access must still be paired with Lake
+  # Formation DESCRIBE/SELECT grants below for actual data visibility.
+  CDCUQAValidationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-qa-validation-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AthenaValidationAccess
+            Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:StopQueryExecution
+              - athena:GetWorkGroup
+            Resource:
+              - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdcu-${Environment}-workgroup"
+
+          - Sid: AthenaOutputBucket
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1/*"
+
+          - Sid: QuickSightValidationReview
+            Effect: Allow
+            Action:
+              - quicksight:DescribeDashboard
+              - quicksight:ListDashboards
+              - quicksight:DescribeAnalysis
+              - quicksight:ListAnalyses
+              - quicksight:DescribeDataSet
+              - quicksight:ListDataSets
+              - quicksight:DescribeDataSource
+              - quicksight:ListDataSources
+              - quicksight:GetDashboardEmbedUrl
+              - quicksight:GenerateEmbedUrlForRegisteredUser
+            Resource: "*"
+
+  # CODEPIPELINE POLICY
+  # Merges viewer and release-manager capabilities from the original template.
+  # Attach to release managers for approval access; attach to viewer-only users
+  # only if BPI-MS accepts approval capability in the same permission package.
+  CDCUCodePipelinePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-codepipeline-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CodePipelineViewer
+            Effect: Allow
+            Action:
+              - codepipeline:GetPipeline
+              - codepipeline:GetPipelineState
+              - codepipeline:ListPipelines
+            Resource:
+              - !Sub "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:cdcu-${Environment}-pipeline"
+
+          - Sid: ReleaseManagerApproval
+            Effect: Allow
+            Action:
+              - codepipeline:PutApprovalResult
+              - codepipeline:GetPipelineState
+            Resource:
+              - !Sub "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:cdcu-${Environment}-pipeline"
+
+  # ATHENA POLICY
+  # Added Athena GetWorkGroup/query/result access after AWS assessment showed
+  # athena:GetWorkGroup restrictions blocked CDCU workgroup validation. S3 result
+  # bucket permissions are included because Athena queries need to write/read
+  # query outputs.
+  CDCUAthenaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-athena-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AthenaQueryExecution
+            Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:StopQueryExecution
+              - athena:ListQueryExecutions
+              - athena:ListNamedQueries
+              - athena:GetWorkGroup
+            Resource:
+              - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdcu-${Environment}-workgroup"
+
+          - Sid: AthenaResultBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-apse1/*"
+
+  # SAGEMAKER POLICY
+  # Added Studio discovery and app lifecycle actions because the CDCU Terraform
+  # deployment provisions SageMaker Studio domains, user profiles, and JupyterLab
+  # spaces. DE users need these actions to open and operate approved Studio apps.
+  # Domain/user-profile creation remains denied in the global policy because
+  # Terraform/BPI-MS owns provisioning.
+  CDCUSageMakerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-sagemaker-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SageMakerStudioDiscovery
+            Effect: Allow
+            Action:
+              - sagemaker:ListEndpoints
+              - sagemaker:ListTrainingJobs
+              - sagemaker:ListLabelingJobs
+              - sagemaker:ListModels
+              - sagemaker:ListClusters
+              - sagemaker:ListNotebookInstances
+              - sagemaker:ListDomains
+              - sagemaker:DescribeDomain
+              - sagemaker:ListUserProfiles
+              - sagemaker:DescribeUserProfile
+              - sagemaker:ListSpaces
+              - sagemaker:DescribeSpace
+              - sagemaker:ListApps
+              - sagemaker:DescribeApp
+              - sagemaker:CreatePresignedDomainUrl
+              - sagemaker:ListTags
+            Resource: "*"
+
+          - Sid: SageMakerStudioAppLifecycle
+            Effect: Allow
+            Action:
+              - sagemaker:CreateApp
+              - sagemaker:DeleteApp
+              - sagemaker:AddTags
+              - sagemaker:DeleteTags
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:app/*/*/*/*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:space/*/*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:user-profile/*/*"
+
+          - Sid: SageMakerDescribeResources
+            Effect: Allow
+            Action:
+              - sagemaker:DescribeProcessingJob
+              - sagemaker:DescribeTrainingJob
+              - sagemaker:DescribeModel
+              - sagemaker:DescribeEndpointConfig
+              - sagemaker:DescribeEndpoint
+              - sagemaker:DescribePipeline
+              - sagemaker:DescribePipelineExecution
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:training-job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:pipeline/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:model/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint-config/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:notebook-instance/cdcu-${Environment}-*"
+
+          - Sid: SageMakerControlledExecution
+            Effect: Allow
+            Action:
+              - sagemaker:CreateProcessingJob
+              - sagemaker:StopProcessingJob
+              - sagemaker:CreateTrainingJob
+              - sagemaker:StopTrainingJob
+              - sagemaker:CreatePipeline
+              - sagemaker:StartPipelineExecution
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:training-job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:pipeline/cdcu-${Environment}-*"
+
+          - Sid: SageMakerS3CDCUBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
+
+          - Sid: SageMakerS3CDCUObjectAccess
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
+
+          - Sid: SageMakerS3DefaultBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+            Resource:
+              - "arn:aws:s3:::sagemaker-*"
+
+          - Sid: SageMakerS3DefaultObjectAccess
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource:
+              - "arn:aws:s3:::sagemaker-*/*"
+
+  # SECRETS MANAGER POLICY
+  CDCUSecretsManagerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-secretsmanager-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: SecretsManagerRead
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+              - secretsmanager:ListSecretVersionIds
+              - secretsmanager:GetResourcePolicy
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:cdcu/${Environment}/*"
+
+          - Sid: SecretsDiscovery
+            Effect: Allow
+            Action:
+              - secretsmanager:ListSecrets
+            Resource: "*"
+
+          - Sid: KMSAccess
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+              - kms:Encrypt
+              - kms:GenerateDataKey
+              - kms:DescribeKey
+            Resource:
+              - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+            Condition:
+              StringLike:
+                kms:ResourceAliases:
+                  - !Sub "alias/cdcu-${Environment}-*"
+
+          - Sid: KMSDiscovery
+            Effect: Allow
+            Action:
+              - kms:ListAliases
+            Resource: "*"
+
+  # DE SAGEMAKER PASSROLE POLICY
+  # Attach only to Data Engineering. This supports DE users launching SageMaker
+  # Processing/Training jobs from Studio while avoiding broad PassRole for CE/QA.
+  # This is intentionally separate from the shared SageMaker policy so BPI-MS can
+  # approve or remove the exception independently. It is needed only when DE
+  # notebooks/scripts create managed SageMaker jobs that pass an execution role.
+  CDCUDataEngineerSageMakerPassRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-de-sagemaker-passrole-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowOnlyApprovedSageMakerExecutionRoles
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-SageMakerExecutionRole"
+            Condition:
+              StringEquals:
+                iam:PassedToService:
+                  - sagemaker.amazonaws.com
+
+  # DE GLUE PASSROLE POLICY
+  # Attach only to Data Engineering. Allows DE users to create and update Glue jobs
+  # by passing the approved CDCU Glue execution role. Intentionally separate from
+  # the SageMaker PassRole policy so BPI-MS can approve or revoke independently.
+  CDCUDataEngineerGluePassRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-de-glue-passrole-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowOnlyApprovedGlueExecutionRoles
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-GlueExecutionRole"
+            Condition:
+              StringEquals:
+                iam:PassedToService:
+                  - glue.amazonaws.com
+
+  # TERRAFORM BACKEND POLICY
+  # Optional and intentionally not attached to CE/DE/QA by default. Attach only to
+  # an approved Terraform operator group/role if BPI-MS allows Stratpoint to run Terraform.
+  # This policy covers the backend that terraform-etl-analytics uses:
+  # - S3 state bucket: cdcu-terraform-state-{env}
+  # - DynamoDB lock table: cdcu-terraform-locks-{env}
+  # It does not grant CDCU data lake, Glue, SageMaker, Athena, or broad DynamoDB access.
+  CDCUTerraformBackendPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-terraform-backend-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: S3TerraformStateBucketList
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-terraform-state-${Environment}-apse1"
+
+          - Sid: S3TerraformStateObjectAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-terraform-state-${Environment}-apse1/*"
+
+          - Sid: DynamoDBStateLockAccess
+            Effect: Allow
+            Action:
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/cdcu-terraform-locks-${Environment}"
+
+  # GLUE POLICY
+  # Glue catalog/job/crawler visibility is required for CDCU ETL validation. During
+  # SIT testing, Glue crawlers and jobs were provisioned by Terraform and then
+  # operated through the CLI. Lake Formation grants below are still required when
+  # LF governance is enabled; Glue IAM alone is not sufficient.
+  CDCUGluePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-glue-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CDCUGlueCatalog
+            Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetCatalogs
+              - glue:GetTable
+              - glue:GetTables
+              - glue:SearchTables
+              - glue:GetConnections
+              - glue:CreateTable
+              - glue:UpdateTable
+              - glue:DeleteTable
+              - glue:GetPartition
+              - glue:GetPartitions
+              - glue:BatchGetPartition
+              - glue:BatchCreatePartition
+              - glue:BatchDeletePartition
+              - glue:CreateScript
+              - glue:GetScript
+              - glue:GetDataflowGraph
+              - glue:DescribeInboundIntegrations
+              - glue:GetTags
+              - glue:ListSchemas
+              - glue:GetRegistry
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/cdcu_${Environment}_catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/cdcu_standardized_db"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_${Environment}_catalog/*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_standardized_db/*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:registry/*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:schema/*"
+
+          - Sid: CDCUCrawlers
+            Effect: Allow
+            Action:
+              - glue:CreateCrawler
+              - glue:UpdateCrawler
+              - glue:DeleteCrawler
+              - glue:GetCrawler
+              - glue:GetCrawlers
+              - glue:GetCrawlerMetrics
+              - glue:StartCrawler
+              - glue:StopCrawler
+              - glue:GetTags
+              - glue:TagResource
+              - glue:UntagResource
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/cdcu-${Environment}-*"
+
+          - Sid: GlueStudioConsoleWildcard
+            # These actions have no resource-level restriction in IAM - AWS requires Resource '*'.
+            # glue:GetCrawlerMetrics on '*' is needed for the Glue console crawlers list page.
+            # glue:ListSchemas/GetRegistry on '*' is needed for the Schema Registry panel.
+            # cloudwatch:GetMetricStatistics on '*' is needed for Glue job metrics graphs.
+            Effect: Allow
+            Action:
+              - glue:GetCrawlerMetrics
+              - glue:ListSchemas
+              - glue:GetRegistry
+              - glue:ListRegistries
+              - cloudwatch:GetMetricStatistics
+            Resource: "*"
+
+          - Sid: CDCUJobs
+            Effect: Allow
+            Action:
+              - glue:GetJob
+              - glue:GetJobs
+              - glue:BatchGetJobs
+              - glue:StartJobRun
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchStopJobRun
+              - glue:CreateJob
+              - glue:UpdateJob
+              - glue:DeleteJob
+              - glue:GetJobBookmark
+              - glue:ResetJobBookmark
+              - glue:GetTags
+              - glue:TagResource
+              - glue:UntagResource
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/glue-test-*"
+
+          - Sid: CDCUConnections
+            Effect: Allow
+            Action:
+              - glue:GetConnection
+              - glue:GetConnections
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
+
+          - Sid: GlueVPCRead
+            Effect: Allow
+            Action:
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DescribeSubnets
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeVpcs
+              - ec2:DescribeVpcEndpoints
+              - ec2:DescribeRouteTables
+            Resource: "*"
+
+          - Sid: GlueVPCNetworkInterfaceRuntime
+            Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DeleteNetworkInterface
+              - ec2:CreateNetworkInterfacePermission
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: ap-southeast-1
+
+  # DATA ENGINEERING ACCESS PATCH POLICY
+  # Additive policy for DE runtime and console access gaps identified during SIT.
+  # This is intentionally one managed policy so the data engineering group stays
+  # under the default AWS managed-policy attachment quota of 10 policies.
+  # CDCU runtime access is resource-scoped where AWS supports it. Console
+  # discovery, Glue Studio script generation, and QuickSight discovery actions
+  # require Resource "*" due to AWS IAM service limitations and are controlled by
+  # the Include* parameters above for BPI-MS review.
+  CDCUDataEngineeringAccessPatchPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-data-engineering-least-privilege-patch"
+      Description: Least-privilege CDCU Data Engineering patch for Athena, Glue, S3, and optional QuickSight authoring access.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AthenaCDCUWorkgroupAccess
+            Effect: Allow
+            Action:
+              - athena:BatchGetQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:GetWorkGroup
+              - athena:ListQueryExecutions
+              - athena:StartQueryExecution
+              - athena:StopQueryExecution
+            Resource:
+              - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdcu-${Environment}-workgroup"
+
+          - Sid: AthenaCDCUCatalogMetadataAccess
+            Effect: Allow
+            Action:
+              - athena:GetDataCatalog
+              - athena:GetTableMetadata
+              - athena:ListDatabases
+              - athena:ListTableMetadata
+            Resource:
+              - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:datacatalog/AwsDataCatalog"
+
+          - Sid: S3CDCUBucketReadMetadata
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
+
+          - Sid: S3CDCUObjectAccess
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
+
+          - Sid: S3GlueStudioAssetsBucketAccess
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:ListBucketMultipartUploads
+            Resource:
+              - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"
+
+          - Sid: S3GlueStudioAssetsObjectAccess
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:GetObject
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}/*"
+
+          - Sid: GlueCDCUCatalogAccess
+            Effect: Allow
+            Action:
+              - glue:BatchCreatePartition
+              - glue:BatchDeletePartition
+              - glue:BatchGetPartition
+              - glue:CreateTable
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetPartition
+              - glue:GetPartitions
+              - glue:GetTable
+              - glue:GetTables
+              - glue:SearchTables
+              - glue:GetConnections
+              - glue:UpdateTable
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/cdcu_${Environment}_catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/cdcu_standardized_db"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_${Environment}_catalog/*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_standardized_db/*"
+
+          - Sid: GlueCDCUCrawlerAccess
+            Effect: Allow
+            Action:
+              - glue:CreateCrawler
+              - glue:UpdateCrawler
+              - glue:DeleteCrawler
+              - glue:GetCrawler
+              - glue:GetCrawlerMetrics
+              - glue:GetCrawlers
+              - glue:StartCrawler
+              - glue:StopCrawler
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/cdcu-${Environment}-*"
+
+          - Sid: GlueCDCUJobAccess
+            Effect: Allow
+            Action:
+              - glue:BatchStopJobRun
+              - glue:CreateJob
+              - glue:DeleteJob
+              - glue:GetJob
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:GetJobs
+              - glue:StartJobRun
+              - glue:UpdateJob
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/glue-test-*"
+
+          - Sid: GlueCDCUConnectionAccess
+            Effect: Allow
+            Action:
+              - glue:CreateConnection
+              - glue:GetConnection
+              - glue:GetConnections
+              - glue:GetTags
+              - glue:UpdateConnection
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/glue-test-*"
+
+          - !If
+            - EnableGlueStudioScriptPermissions
+            - Sid: GlueStudioScriptGeneration
+              Effect: Allow
+              Action:
+                - glue:CreateScript
+                - glue:GetScript
+              Resource: "*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableGlueJobAuthoringPermissions
+            - Sid: GlueJobRoleDiscovery
+              Effect: Allow
+              Action:
+                - iam:ListRoles
+              Resource: "*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableGlueJobAuthoringPermissions
+            - Sid: GlueApprovedJobAuthoring
+              Effect: Allow
+              Action:
+                - glue:CreateJob
+                - glue:UpdateJob
+                - glue:DeleteJob
+              Resource:
+                - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
+                - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/glue-test-*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableGlueJobAuthoringPermissions
+            - Sid: GlueApprovedExecutionRoleRead
+              Effect: Allow
+              Action:
+                - iam:GetRole
+                - iam:ListAttachedRolePolicies
+                - iam:ListRolePolicies
+              Resource:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-GlueExecutionRole"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableGlueJobAuthoringPermissions
+            - Sid: GlueApprovedExecutionRolePass
+              Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-GlueExecutionRole"
+              Condition:
+                StringEquals:
+                  iam:PassedToService: glue.amazonaws.com
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableConsoleDiscoveryPermissions
+            - Sid: ConsoleDiscoveryActions
+              Effect: Allow
+              Action:
+                - athena:ListWorkGroups
+                - glue:ListConnections
+                - glue:ListCrawlers
+                - glue:ListDatabases
+                - glue:ListJobs
+                - kms:DescribeKey
+                - kms:ListAliases
+                - rds:DescribeDBClusters
+                - rds:DescribeDBInstances
+                - rds:DescribeDBSubnetGroups
+                - s3:GetBucketLocation
+                - s3:ListAllMyBuckets
+                - tag:GetResources
+              Resource: "*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableQuickSightAuthorPermissions
+            - Sid: QuickSightCDCUAuthorResources
+              Effect: Allow
+              Action:
+                - quicksight:CreateAnalysis
+                - quicksight:CreateDashboard
+                - quicksight:CreateDataSet
+                - quicksight:CreateDataSource
+                - quicksight:DeleteAnalysis
+                - quicksight:DeleteDashboard
+                - quicksight:DeleteDataSet
+                - quicksight:DeleteDataSource
+                - quicksight:DescribeAnalysis
+                - quicksight:DescribeDashboard
+                - quicksight:DescribeDataSet
+                - quicksight:DescribeDataSource
+                - quicksight:PassDataSet
+                - quicksight:PassDataSource
+                - quicksight:UpdateAnalysis
+                - quicksight:UpdateDashboard
+                - quicksight:UpdateDataSet
+                - quicksight:UpdateDataSource
+              Resource:
+                - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:analysis/cdcu-${Environment}-*"
+                - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:dashboard/cdcu-${Environment}-*"
+                - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:dataset/cdcu-${Environment}-*"
+                - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:datasource/cdcu-${Environment}-*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableQuickSightAuthorPermissions
+            - Sid: QuickSightCDCUListAndAccountDiscovery
+              Effect: Allow
+              Action:
+                - quicksight:DescribeAccountSettings
+                - quicksight:DescribeAccountSubscription
+                - quicksight:DescribeUser
+                - quicksight:GetAccountSettings
+                - quicksight:ListAnalyses
+                - quicksight:ListDashboards
+                - quicksight:ListDataSets
+                - quicksight:ListDataSources
+                - quicksight:ListUsers
+              Resource: "*"
+            - !Ref AWS::NoValue
+
+          - !If
+            - EnableSageMakerAmazonQPermissions
+            - Sid: SageMakerAmazonQDeveloperAssistant
+              Effect: Allow
+              Action:
+                - q:StartConversation
+                - q:SendMessage
+                - q:GetConversation
+                - q:ListConversations
+                - q:DeleteConversation
+                - q:PassRequest
+                - qdeveloper:*
+                - sagemaker-data-science-assistant:SendConversation
+                - sagemaker-data-science-assistant:GetConversation
+                - sagemaker-data-science-assistant:ListConversations
+                - codewhisperer:GenerateRecommendations
+              Resource: "*"
+            - !Ref AWS::NoValue
+
+  # QUICKSIGHT BOOTSTRAP POLICY
+  # Use only for initial QuickSight account subscription/onboarding or user
+  # registration. This policy is intentionally not attached to CE/DE/QA groups;
+  # BPI-MS can attach it temporarily to an approved bootstrap administrator.
+  CDCUQuickSightBootstrapPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: EnableQuickSightBootstrapPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-quicksight-bootstrap-policy"
+      Description: Temporary QuickSight bootstrap access for account subscription and initial user registration.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: QuickSightAccountSubscription
+            Effect: Allow
+            Action:
+              - quicksight:Subscribe
+              - quicksight:CreateAccountSubscription
+              - quicksight:DescribeAccountSubscription
+              - quicksight:DescribeAccountSettings
+              - quicksight:GetAccountSettings
+            Resource: "*"
+
+          - Sid: QuickSightInitialAdminAndAuthorRegistration
+            Effect: Allow
+            Action:
+              - quicksight:CreateAdmin
+              - quicksight:RegisterUser
+              - quicksight:CreateUser
+              - quicksight:UpdateUser
+              - quicksight:DescribeUser
+              - quicksight:ListUsers
+            Resource:
+              - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:user/default/*"
+              - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:namespace/default"
+
+  # CLOUD ENGINEER GROUP
+  # CE receives infrastructure/service visibility and operational validation
+  # policies, but no broad human PassRole. Terraform or a future pipeline role
+  # should perform create/update operations that require passing execution roles.
+  CDCUCloudEngineersGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-cloud-engineers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUDeveloperPolicy
+        - !Ref CDCUCodePipelinePolicy
+        - !Ref CDCUSageMakerPolicy
+        - !Ref CDCUAthenaPolicy
+        - !Ref CDCUSecretsManagerPolicy
+        - !Ref CDCUGluePolicy
+        - arn:aws:iam::aws:policy/AmazonQDeveloperAccess
+      Policies:
+        - PolicyName: CloudEngineerVPCViewInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: VPCReadOnlyAccess
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeNatGateways
+                  - ec2:DescribeVpcEndpoints
+                  - ec2:DescribeVpcEndpointServices
+                  - ec2:DescribeVpcAttribute
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSecurityGroupRules
+                  - ec2:DescribeStaleSecurityGroups
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribePrefixLists
+                  - ec2:DescribeManagedPrefixLists
+                  - ec2:GetManagedPrefixListEntries
+                  - ec2:DescribeFlowLogs
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeAddresses
+                  - ec2:DescribeInstances
+                  - ec2:DescribeTags
+                  - ec2:DescribeTransitGateways
+                  - ec2:DescribeTransitGatewayAttachments
+                  - ec2:DescribeVpnConnections
+                  - ec2:DescribeVpnGateways
+                  - rds:DescribeDBInstances
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBSubnetGroups
+                  - rds:DescribeDBSecurityGroups
+                  - rds:DescribeDBParameterGroups
+                  - rds:DescribeDBClusterParameterGroups
+                Resource: "*"
+
+              - Sid: ExplicitlyDenyVPCModification
+                Effect: Deny
+                Action:
+                  - ec2:CreateVpc
+                  - ec2:DeleteVpc
+                  - ec2:ModifyVpc*
+                  - ec2:CreateSubnet
+                  - ec2:DeleteSubnet
+                  - ec2:ModifySubnet*
+                  - ec2:CreateRoute*
+                  - ec2:DeleteRoute*
+                  - ec2:ReplaceRoute*
+                  - ec2:AssociateRouteTable
+                  - ec2:DisassociateRouteTable
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:ModifyNetworkInterfaceAttribute
+                  - ec2:CreateVpcEndpoint
+                  - ec2:DeleteVpcEndpoints
+                  - ec2:ModifyVpcEndpoint
+                  - ec2:CreateNatGateway
+                  - ec2:DeleteNatGateway
+                Resource: "*"
+        - PolicyName: CloudEngineerIAMReadOnlyInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: IAMListAccess
+                Effect: Allow
+                Action:
+                  - iam:ListUsers
+                  - iam:ListGroups
+                  - iam:ListPolicies
+                  - iam:ListAttachedGroupPolicies
+                  - iam:ListGroupPolicies
+                  - iam:ListEntitiesForPolicy
+                  - iam:ListPolicyVersions
+                  - iam:GetAccountSummary
+
+                Resource: "*"
+
+              - Sid: IAMReadSPUsers
+                Effect: Allow
+                Action:
+                  - iam:GetUser
+                  - iam:ListAttachedUserPolicies
+                  - iam:ListUserPolicies
+                  - iam:ListGroupsForUser
+
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/sp-*"
+
+              - Sid: IAMReadSPAndCDCUGroups
+                Effect: Allow
+                Action:
+                  - iam:GetGroup
+                  - iam:GetGroupPolicy
+                  - iam:ListAttachedGroupPolicies
+                  - iam:ListGroupPolicies
+
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/sp-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/*cdcu*"
+
+              - Sid: IAMReadSPAndCDCUPolicies
+                Effect: Allow
+
+                Action:
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:ListPolicyVersions
+
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/sp-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*cdcu*"
+        # CODEPIPELINE
+        - PolicyName: CloudEngineerCodePipelineInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # CODEPIPELINE MANAGEMENT
+              - Sid: CodePipelineManagement
+                Effect: Allow
+                Action:
+                  - codepipeline:CreatePipeline
+                  - codepipeline:UpdatePipeline
+                  - codepipeline:DeletePipeline
+                  - codepipeline:GetPipeline
+                  - codepipeline:GetPipelineState
+                  - codepipeline:GetPipelineExecution
+                  - codepipeline:ListPipelines
+                  - codepipeline:ListPipelineExecutions
+                  - codepipeline:StartPipelineExecution
+                  - codepipeline:StopPipelineExecution
+                  - codepipeline:RetryStageExecution
+                  - codepipeline:TagResource
+                  - codepipeline:UntagResource
+                Resource:
+                  - !Sub "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:cdcu-${Environment}-*"
+
+              # CODEBUILD ACCESS
+              - Sid: CodeBuildManagement
+                Effect: Allow
+                Action:
+                  - codebuild:CreateProject
+                  - codebuild:UpdateProject
+                  - codebuild:DeleteProject
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                  - codebuild:BatchGetBuilds
+                  - codebuild:BatchGetProjects
+                  - codebuild:ListProjects
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cdcu-${Environment}-*"
+
+              # CODECOMMIT ACCESS
+              - Sid: CodeCommitAccess
+                Effect: Allow
+                Action:
+                  - codecommit:GetRepository
+                  - codecommit:GitPull
+                  - codecommit:GitPush
+                  - codecommit:ListBranches
+                Resource:
+                  - !Sub "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:cdcu"
+
+              # ARTIFACT BUCKET ACCESS
+              - Sid: PipelineArtifactBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-artifacts"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-artifacts/*"
+
+              # EVENTBRIDGE FOR PIPELINE TRIGGERS
+              - Sid: EventBridgePipelineRules
+                Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:DeleteRule
+                  - events:RemoveTargets
+                  - events:DescribeRule
+                Resource:
+                  - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
+
+              # REQUIRED FOR CODEPIPELINE / CODEBUILD
+              - Sid: IAMPassRoleForPipeline
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/cdcu-${Environment}-*"
+                Condition:
+                  StringEquals:
+                    iam:PassedToService:
+                      - codepipeline.amazonaws.com
+                      - codebuild.amazonaws.com
+
+  # DATA ENGINEERS GROUP
+  # DE receives SageMaker Studio, Athena, Glue, Secrets read, the scoped
+  # SageMaker PassRole exception for managed processing/training jobs launched
+  # from Studio, and the scoped Glue PassRole exception for DE-managed Glue job
+  # creation/update approved by BPI-MS.
+  CDCUDataEngineersGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-data-engineers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUDeveloperPolicy
+        - !Ref CDCUSageMakerPolicy
+        - !Ref CDCUDataEngineerSageMakerPassRolePolicy
+        - !Ref CDCUDataEngineerGluePassRolePolicy
+        - !Ref CDCUAthenaPolicy
+        - !Ref CDCUSecretsManagerPolicy
+        - !Ref CDCUGluePolicy
+        - !Ref CDCUDataEngineeringAccessPatchPolicy
+        - arn:aws:iam::aws:policy/AmazonQDeveloperAccess
+      Policies:
+        - PolicyName: DataEngineerNetworkTroubleshootingInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: NetworkTroubleshootingReadOnlyAccess
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeVpcAttribute
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeVpcEndpoints
+                  - ec2:DescribeVpcEndpointServices
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeSecurityGroupRules
+                  - ec2:DescribeStaleSecurityGroups
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribePrefixLists
+                  - ec2:DescribeManagedPrefixLists
+                  - ec2:GetManagedPrefixListEntries
+                  - ec2:DescribeFlowLogs
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeTags
+                  - rds:DescribeDBInstances
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBSubnetGroups
+                  - rds:DescribeDBSecurityGroups
+                  - rds:DescribeDBParameterGroups
+                  - rds:DescribeDBClusterParameterGroups
+                Resource: "*"
+
+        - PolicyName: DataEngineerEventBridgeCrawlerTriggerInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EventBridgeCrawlerTriggerRules
+                Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:DescribeRule
+                  - events:EnableRule
+                  - events:DisableRule
+                  - events:DeleteRule
+                  - events:RemoveTargets
+                  - events:ListTargetsByRule
+                Resource:
+                  - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
+
+              - Sid: EventBridgeCrawlerTriggerDiscovery
+                Effect: Allow
+                Action:
+                  - events:ListRules
+                  - events:ListEventBuses
+                  - scheduler:ListSchedules
+                  - scheduler:ListScheduleGroups
+                Resource: "*"
+
+  # DEVELOPER GROUP
+  CDCUDevelopersGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-developers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUDeveloperPolicy
+      Policies:
+        - PolicyName: EventBridgeRuleManagementInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EventBridgeAccess
+                Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:DescribeRule
+                  - events:EnableRule
+                  - events:DisableRule
+                  - events:DeleteRule
+                  - events:RemoveTargets
+                  - events:ListTargetsByRule
+                Resource:
+                  - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
+
+              - Sid: EventBridgeDiscovery
+                Effect: Allow
+                Action:
+                  - events:ListRules
+                  - events:ListEventBuses
+                  - scheduler:ListSchedules
+                  - scheduler:ListScheduleGroups
+                Resource: "*"
+
+  # QA GROUP
+  # QA receives Athena validation and QuickSight review access. QA does not receive
+  # PassRole, Glue/SageMaker administration, broad S3 list-all, or broad DynamoDB.
+  CDCUQAGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-qa"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUQAValidationPolicy
+
+  # BUSINESS REVIEW GROUP
+  CDCUBusinessReviewGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-business-review"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUQAValidationPolicy
+
+  # CODEPIPELINE VIEWER GROUP
+  CDCUCodePipelineViewerGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-codepipeline-viewers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUCodePipelinePolicy
+
+  # RELEASE MANAGER GROUP
+  CDCUReleaseManagersGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-release-managers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUCodePipelinePolicy
+
+  # TERRAFORM OPERATORS GROUP
+  # Optional group for scoped Terraform backend locking only. It is not a data
+  # access group and receives no broad DynamoDB table visibility.
+  CDCUTerraformOperatorsGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-terraform-operators"
+      ManagedPolicyArns:
+        - !Ref CDCUTerraformBackendPolicy
+
+  # LAKE FORMATION GRANTS
+  # These are optional because Lake Formation principals must be IAM users/roles
+  # or QuickSight principals, not IAM groups. Use the parameters above when BPI-MS
+  # confirms the exact execution/query principals.
+  # SIT validation proved these grants are required:
+  # - Glue crawler failed until the Glue execution role had DESCRIBE/CREATE_TABLE
+  #   on the CDCU catalog database.
+  # - Crawlers needed DATA_LOCATION_ACCESS on the registered CDCU S3 data location.
+  # - Athena could see tables but no columns until the query principal had
+  #   DESCRIBE/SELECT on the tables.
+  CDCUGlueDatabasePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasGlueExecutionRoleArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref GlueExecutionRoleArn
+      Resource:
+        DatabaseResource:
+          Name: !Sub "cdcu_${Environment}_catalog"
+      Permissions:
+        - DESCRIBE
+        - CREATE_TABLE
+        - ALTER
+        - DROP
+
+  CDCUGlueStandardizedDatabasePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasGlueExecutionRoleArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref GlueExecutionRoleArn
+      Resource:
+        DatabaseResource:
+          Name: cdcu_standardized_db
+      Permissions:
+        - DESCRIBE
+        - CREATE_TABLE
+        - ALTER
+        - DROP
+
+  CDCUGlueDataLocationPermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasGlueExecutionRoleArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref GlueExecutionRoleArn
+      Resource:
+        DataLocationResource:
+          S3Resource: !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1"
+      Permissions:
+        - DATA_LOCATION_ACCESS
+
+  CDCUAthenaDatabasePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasAthenaQueryPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref AthenaQueryPrincipalArn
+      Resource:
+        DatabaseResource:
+          Name: !Sub "cdcu_${Environment}_catalog"
+      Permissions:
+        - DESCRIBE
+
+  CDCUAthenaStandardizedDatabasePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasAthenaQueryPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref AthenaQueryPrincipalArn
+      Resource:
+        DatabaseResource:
+          Name: cdcu_standardized_db
+      Permissions:
+        - DESCRIBE
+
+  CDCUAthenaTablePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasAthenaQueryPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref AthenaQueryPrincipalArn
+      Resource:
+        TableResource:
+          DatabaseName: !Sub "cdcu_${Environment}_catalog"
+          TableWildcard: {}
+      Permissions:
+        - DESCRIBE
+        - SELECT
+
+  CDCUAthenaStandardizedTablePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasAthenaQueryPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref AthenaQueryPrincipalArn
+      Resource:
+        TableResource:
+          DatabaseName: cdcu_standardized_db
+          TableWildcard: {}
+      Permissions:
+        - DESCRIBE
+        - SELECT
+
+  CDCUQuickSightTablePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasQuickSightPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref QuickSightPrincipalArn
+      Resource:
+        TableResource:
+          DatabaseName: !Sub "cdcu_${Environment}_catalog"
+          TableWildcard: {}
+      Permissions:
+        - DESCRIBE
+        - SELECT
+
+  CDCUQuickSightStandardizedTablePermissions:
+    Type: AWS::LakeFormation::Permissions
+    Condition: HasQuickSightPrincipalArn
+    Properties:
+      DataLakePrincipal:
+        DataLakePrincipalIdentifier: !Ref QuickSightPrincipalArn
+      Resource:
+        TableResource:
+          DatabaseName: cdcu_standardized_db
+          TableWildcard: {}
+      Permissions:
+        - DESCRIBE
+        - SELECT
+
+Outputs:
+  DevelopersGroup:
+    Value: !Ref CDCUDevelopersGroup
+
+  DataEngineersGroup:
+    Value: !Ref CDCUDataEngineersGroup
+
+  CloudEngineersGroup:
+    Value: !Ref CDCUCloudEngineersGroup
+
+  QAGroup:
+    Value: !Ref CDCUQAGroup
+
+  BusinessReviewGroup:
+    Value: !Ref CDCUBusinessReviewGroup
+
+  CodePipelineViewerGroup:
+    Value: !Ref CDCUCodePipelineViewerGroup
+
+  ReleaseManagersGroup:
+    Value: !Ref CDCUReleaseManagersGroup
+
+  DataEngineerSageMakerPassRolePolicyArn:
+    Value: !Ref CDCUDataEngineerSageMakerPassRolePolicy
+
+  DataEngineerGluePassRolePolicyArn:
+    Value: !Ref CDCUDataEngineerGluePassRolePolicy
+
+  DataEngineeringAccessPatchPolicyArn:
+    Value: !Ref CDCUDataEngineeringAccessPatchPolicy
+
+  DataEngineeringGlueStudioScriptPermissionsIncluded:
+    Value: !Ref IncludeGlueStudioScriptPermissions
+
+  DataEngineeringGlueJobAuthoringPermissionsIncluded:
+    Value: !Ref IncludeGlueJobAuthoringPermissions
+
+  DataEngineeringConsoleDiscoveryPermissionsIncluded:
+    Value: !Ref IncludeConsoleDiscoveryPermissions
+
+  DataEngineeringQuickSightAuthorPermissionsIncluded:
+    Value: !Ref IncludeQuickSightAuthorPermissions
+
+  QuickSightBootstrapPolicyArn:
+    Condition: EnableQuickSightBootstrapPolicy
+    Value: !Ref CDCUQuickSightBootstrapPolicy
+
+  DataEngineeringSageMakerAmazonQPermissionsIncluded:
+    Value: !Ref IncludeSageMakerAmazonQPermissions
+
+  TerraformBackendPolicyArn:
+    Value: !Ref CDCUTerraformBackendPolicy
+
+  TerraformOperatorsGroup:
+    Value: !Ref CDCUTerraformOperatorsGroup

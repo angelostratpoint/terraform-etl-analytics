@@ -1,0 +1,299 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: CDCU Network Prerequisites - BPI-MS OSP VPC
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - sit
+      - uat
+      - prod
+    Description: CDCU target environment.
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing BPI-MS OSP VPC ID. Example vpc-034f6b0c6108b790f.
+
+  VpcCidr:
+    Type: String
+    Default: 10.190.0.0/16
+    Description: CIDR block of the existing BPI-MS OSP VPC.
+
+  CDCUPrivateSubnetCidr:
+    Type: String
+    Default: 10.190.24.0/24
+    Description: CDCU isolated private subnet CIDR for initial runtime validation.
+
+  CDCUAvailabilityZone:
+    Type: String
+    Default: ap-southeast-1a
+    Description: Availability Zone for the initial CDCU private subnet.
+
+  PrivateRouteTableId:
+    Type: String
+    Default: rtb-0788233a4e0fae9b9
+    Description: Existing BPI-MS OSP private route table ID used for CDCU private subnet traffic. Do not delete this route table; it is shared with existing OSP private subnets.
+
+  ExistingRdsSecurityGroupId:
+    Type: String
+    Default: sg-06ff146518f2cfb34
+    Description: Existing BPI-MS MySQL/RDS security group ID allowed to receive CDCU runtime traffic. Current SIT value is bpims-osp-sg-rds.
+
+Resources:
+  CDCUPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Ref CDCUPrivateSubnetCidr
+      AvailabilityZone: !Ref CDCUAvailabilityZone
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-private-subnet-1a"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUPrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref CDCUPrivateSubnet
+      RouteTableId: !Ref PrivateRouteTableId
+
+  CDCURuntimeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "cdcu-${Environment}-runtime-sg"
+      GroupDescription: !Sub "CDCU ${Environment} runtime security group for Glue and SageMaker"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - Description: Allow MySQL/RDS connectivity from CDCU runtime workloads.
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          DestinationSecurityGroupId: !Ref ExistingRdsSecurityGroupId
+        - Description: Allow HTTPS to private AWS service endpoints in the VPC.
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+        - Description: Allow HTTPS to S3 through the existing S3 Gateway endpoint.
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationPrefixListId: pl-6fa54006
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-runtime-sg"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCURuntimeSecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CDCURuntimeSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref CDCURuntimeSecurityGroup
+      Description: Self-reference required for Glue and SageMaker runtime ENI communication (inbound).
+
+  CDCURuntimeSecurityGroupSelfEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref CDCURuntimeSecurityGroup
+      IpProtocol: "-1"
+      DestinationSecurityGroupId: !Ref CDCURuntimeSecurityGroup
+      Description: Self-reference required for Glue and SageMaker runtime ENI communication (outbound).
+
+  CDCUSecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.secretsmanager"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-secretsmanager-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUGlueEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.glue"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-glue-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCULogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-logs-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUKMSEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.kms"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-kms-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUSageMakerApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sagemaker.api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-sagemaker-api-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUSageMakerRuntimeEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sagemaker.runtime"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-sagemaker-runtime-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+  CDCUSTSEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref CDCUPrivateSubnet
+      SecurityGroupIds:
+        - !Ref CDCURuntimeSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "cdcu-${Environment}-sts-endpoint"
+        - Key: Project
+          Value: CDCU
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Owner
+          Value: BPI-MS
+
+Outputs:
+  CDCUVpcId:
+    Description: Existing BPI-MS OSP VPC consumed by CDCU.
+    Value: !Ref VpcId
+
+  CDCUPrivateSubnetId:
+    Description: CDCU private subnet ID for Terraform subnet_id and subnet_ids.
+    Value: !Ref CDCUPrivateSubnet
+
+  CDCURuntimeSecurityGroupId:
+    Description: CDCU runtime security group ID for Terraform existing_security_group_id.
+    Value: !Ref CDCURuntimeSecurityGroup
+
+  CDCUPrivateSubnetCidr:
+    Description: CDCU private subnet CIDR used by this stack.
+    Value: !Ref CDCUPrivateSubnetCidr
+
+  CDCUAvailabilityZone:
+    Description: Availability Zone used by this stack.
+    Value: !Ref CDCUAvailabilityZone

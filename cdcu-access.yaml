@@ -160,6 +160,7 @@ Resources:
             Action:
               - cloudwatch:GetMetricData
               - cloudwatch:ListMetrics
+              - cloudwatch:DescribeAlarms
             Resource: "*"
 
           # AMAZON Q CONSOLE ASSISTANT
@@ -467,6 +468,8 @@ Resources:
               - quicksight:ListDataSources
               - quicksight:GetDashboardEmbedUrl
               - quicksight:GenerateEmbedUrlForRegisteredUser
+              - quicksight:DescribeGroup
+              - quicksight:ListGroups
             Resource: "*"
 
   # CODEPIPELINE POLICY
@@ -515,6 +518,7 @@ Resources:
               - athena:StartQueryExecution
               - athena:GetQueryExecution
               - athena:GetQueryResults
+              - athena:GetQueryResultsStream
               - athena:StopQueryExecution
               - athena:ListQueryExecutions
               - athena:ListNamedQueries
@@ -566,6 +570,8 @@ Resources:
               - sagemaker:DescribeApp
               - sagemaker:CreatePresignedDomainUrl
               - sagemaker:ListTags
+              - sagemaker:Search
+              - sagemaker:GetSearchSuggestions
             Resource: "*"
 
           - Sid: SageMakerStudioAppLifecycle
@@ -705,16 +711,14 @@ Resources:
               - kms:ListAliases
             Resource: "*"
 
-  # DE SAGEMAKER PASSROLE POLICY
-  # Attach only to Data Engineering. This supports DE users launching SageMaker
-  # Processing/Training jobs from Studio while avoiding broad PassRole for CE/QA.
-  # This is intentionally separate from the shared SageMaker policy so BPI-MS can
-  # approve or remove the exception independently. It is needed only when DE
-  # notebooks/scripts create managed SageMaker jobs that pass an execution role.
-  CDCUDataEngineerSageMakerPassRolePolicy:
+  # DE PASSROLE POLICY
+  # Merged SageMaker and Glue PassRole into one policy to keep CDCUDataEngineersGroup
+  # under the AWS 10 managed-policy-per-group limit. Each service PassRole is a
+  # separate Sid so BPI-MS can audit and revoke them independently.
+  CDCUDataEngineerPassRolePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Sub "${Environment}-cdcu-de-sagemaker-passrole-policy"
+      ManagedPolicyName: !Sub "${Environment}-cdcu-de-passrole-policy"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -729,17 +733,6 @@ Resources:
                 iam:PassedToService:
                   - sagemaker.amazonaws.com
 
-  # DE GLUE PASSROLE POLICY
-  # Attach only to Data Engineering. Allows DE users to create and update Glue jobs
-  # by passing the approved CDCU Glue execution role. Intentionally separate from
-  # the SageMaker PassRole policy so BPI-MS can approve or revoke independently.
-  CDCUDataEngineerGluePassRolePolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      ManagedPolicyName: !Sub "${Environment}-cdcu-de-glue-passrole-policy"
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
           - Sid: AllowOnlyApprovedGlueExecutionRoles
             Effect: Allow
             Action:
@@ -924,18 +917,13 @@ Resources:
                 aws:RequestedRegion: ap-southeast-1
 
   # DATA ENGINEERING ACCESS PATCH POLICY
-  # Additive policy for DE runtime and console access gaps identified during SIT.
-  # This is intentionally one managed policy so the data engineering group stays
-  # under the default AWS managed-policy attachment quota of 10 policies.
-  # CDCU runtime access is resource-scoped where AWS supports it. Console
-  # discovery, Glue Studio script generation, and QuickSight discovery actions
-  # require Resource "*" due to AWS IAM service limitations and are controlled by
-  # the Include* parameters above for BPI-MS review.
+  # Core unconditional statements only. All !If conditional blocks have been moved
+  # to CDCUDataEngineeringOptionalAccessPolicy to stay under the 6144-char limit.
   CDCUDataEngineeringAccessPatchPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Sub "${Environment}-cdcu-data-engineering-least-privilege-patch"
-      Description: Least-privilege CDCU Data Engineering patch for Athena, Glue, S3, and optional QuickSight authoring access.
+      Description: Core DE patch - Athena, S3, and Glue resource-scoped access.
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -965,12 +953,7 @@ Resources:
           - Sid: S3CDCUBucketReadMetadata
             Effect: Allow
             Action:
-              - s3:GetBucketAcl
               - s3:GetBucketLocation
-              - s3:GetBucketNotification
-              - s3:GetBucketPolicyStatus
-              - s3:GetBucketPublicAccessBlock
-              - s3:GetBucketTagging
               - s3:GetBucketVersioning
               - s3:ListBucket
               - s3:ListBucketMultipartUploads
@@ -986,8 +969,6 @@ Resources:
               - s3:AbortMultipartUpload
               - s3:DeleteObject
               - s3:GetObject
-              - s3:GetObjectAcl
-              - s3:GetObjectTagging
               - s3:GetObjectVersion
               - s3:ListMultipartUploadParts
               - s3:PutObject
@@ -997,23 +978,17 @@ Resources:
               - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
               - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
 
-          - Sid: S3GlueStudioAssetsBucketAccess
-            Effect: Allow
-            Action:
-              - s3:GetBucketLocation
-              - s3:ListBucket
-              - s3:ListBucketMultipartUploads
-            Resource:
-              - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"
-
-          - Sid: S3GlueStudioAssetsObjectAccess
+          - Sid: S3GlueStudioAssetsAccess
             Effect: Allow
             Action:
               - s3:AbortMultipartUpload
+              - s3:GetBucketLocation
               - s3:GetObject
+              - s3:ListBucket
               - s3:ListMultipartUploadParts
               - s3:PutObject
             Resource:
+              - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"
               - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}/*"
 
           - Sid: GlueCDCUCatalogAccess
@@ -1039,35 +1014,30 @@ Resources:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_${Environment}_catalog/*"
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_standardized_db/*"
 
-          - Sid: GlueCDCUCrawlerAccess
-            Effect: Allow
-            Action:
-              - glue:CreateCrawler
-              - glue:UpdateCrawler
-              - glue:DeleteCrawler
-              - glue:GetCrawler
-              - glue:GetCrawlerMetrics
-              - glue:GetCrawlers
-              - glue:StartCrawler
-              - glue:StopCrawler
-            Resource:
-              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/cdcu-${Environment}-*"
-
-          - Sid: GlueCDCUJobAccess
+          - Sid: GlueCDCUJobAndCrawlerAccess
             Effect: Allow
             Action:
               - glue:BatchStopJobRun
+              - glue:CreateCrawler
               - glue:CreateJob
+              - glue:DeleteCrawler
               - glue:DeleteJob
+              - glue:GetCrawler
+              - glue:GetCrawlerMetrics
+              - glue:GetCrawlers
               - glue:GetJob
               - glue:GetJobRun
               - glue:GetJobRuns
               - glue:GetJobs
+              - glue:StartCrawler
               - glue:StartJobRun
+              - glue:StopCrawler
+              - glue:UpdateCrawler
               - glue:UpdateJob
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/glue-test-*"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/cdcu-${Environment}-*"
 
           - Sid: GlueCDCUConnectionAccess
             Effect: Allow
@@ -1082,6 +1052,18 @@ Resources:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/glue-test-*"
 
+  # DATA ENGINEERING OPTIONAL ACCESS POLICY
+  # Holds all conditional (!If) blocks split from CDCUDataEngineeringAccessPatchPolicy
+  # to stay under the IAM 6144-character managed policy size limit.
+  # Attach to sit-cdcu-data-engineers alongside the patch policy.
+  CDCUDataEngineeringOptionalAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "${Environment}-cdcu-data-engineering-optional-access"
+      Description: Conditional DE permissions - Glue Studio, console discovery, QuickSight, and SageMaker Q.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
           - !If
             - EnableGlueStudioScriptPermissions
             - Sid: GlueStudioScriptGeneration
@@ -1099,19 +1081,6 @@ Resources:
               Action:
                 - iam:ListRoles
               Resource: "*"
-            - !Ref AWS::NoValue
-
-          - !If
-            - EnableGlueJobAuthoringPermissions
-            - Sid: GlueApprovedJobAuthoring
-              Effect: Allow
-              Action:
-                - glue:CreateJob
-                - glue:UpdateJob
-                - glue:DeleteJob
-              Resource:
-                - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/cdcu-${Environment}-*"
-                - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/glue-test-*"
             - !Ref AWS::NoValue
 
           - !If
@@ -1149,14 +1118,12 @@ Resources:
                 - glue:ListCrawlers
                 - glue:ListDatabases
                 - glue:ListJobs
-                - s3:GetAccountPublicAccessBlock
                 - kms:DescribeKey
                 - kms:ListAliases
                 - rds:DescribeDBClusters
                 - rds:DescribeDBInstances
                 - rds:DescribeDBSubnetGroups
                 - s3:GetBucketLocation
-                - s3:ListAccessPoints
                 - s3:ListAllMyBuckets
                 - tag:GetResources
               Resource: "*"
@@ -1197,10 +1164,8 @@ Resources:
             - Sid: QuickSightCDCUListAndAccountDiscovery
               Effect: Allow
               Action:
-                - quicksight:DescribeAccountSettings
                 - quicksight:DescribeAccountSubscription
                 - quicksight:DescribeUser
-                - quicksight:GetAccountSettings
                 - quicksight:ListAnalyses
                 - quicksight:ListDashboards
                 - quicksight:ListDataSets
@@ -1220,7 +1185,6 @@ Resources:
                 - q:ListConversations
                 - q:DeleteConversation
                 - q:PassRequest
-                - qdeveloper:*
                 - sagemaker-data-science-assistant:SendConversation
                 - sagemaker-data-science-assistant:GetConversation
                 - sagemaker-data-science-assistant:ListConversations
@@ -1264,24 +1228,195 @@ Resources:
               - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:user/default/*"
               - !Sub "arn:aws:quicksight:${QuickSightHomeRegion}:${AWS::AccountId}:namespace/default"
 
-  # CLOUD ENGINEER GROUP
-  # CE receives infrastructure/service visibility and operational validation
-  # policies, but no broad human PassRole. Terraform or a future pipeline role
-  # should perform create/update operations that require passing execution roles.
-  CDCUCloudEngineersGroup:
+  # CLOUD ENGINEERS TEMPORARY ACCESS GROUP
+  # Provides read-only IAM, VPC, and S3 visibility for CE users during BPI-MS review.
+  # Attach users here temporarily when they need audit/read access without full CE privileges.
+  CDCUCloudEngineersTemporaryAccessGroup:
     Type: AWS::IAM::Group
     Properties:
-      GroupName: !Sub "${Environment}-cdcu-cloud-engineers"
-      ManagedPolicyArns:
-        - !Ref CDCUGlobalSecurityPolicy
-        - !Ref CDCUDeveloperPolicy
-        - !Ref CDCUCodePipelinePolicy
-        - !Ref CDCUSageMakerPolicy
-        - !Ref CDCUAthenaPolicy
-        - !Ref CDCUSecretsManagerPolicy
-        - !Ref CDCUGluePolicy
-        - arn:aws:iam::aws:policy/AmazonQDeveloperAccess
+      GroupName: !Sub "${Environment}-cdcu-cloud-engineers-tg"
       Policies:
+        - PolicyName: CloudEngineerReadOnlyPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: IAMListAccess
+                Effect: Allow
+                Action:
+                  - iam:ListUsers
+                  - iam:ListGroups
+                  - iam:ListPolicies
+                  - iam:ListRoles
+                  - iam:ListAttachedUserPolicies
+                  - iam:ListAttachedGroupPolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListUserPolicies
+                  - iam:ListGroupPolicies
+                  - iam:ListRolePolicies
+                  - iam:ListGroupsForUser
+                  - iam:ListEntitiesForPolicy
+                Resource: "*"
+
+              - Sid: IAMReadCDCUResources
+                Effect: Allow
+                Action:
+                  - iam:GetUser
+                  - iam:GetGroup
+                  - iam:GetRole
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:GetGroupPolicy
+                  - iam:GetUserPolicy
+                  - iam:GetRolePolicy
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/*cdcu*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/*cdcu*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/*cdcu*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*cdcu*"
+
+              - Sid: VPCReadOnly
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeNatGateways
+                  - ec2:DescribeVpcEndpoints
+                  - ec2:DescribeVpcPeeringConnections
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeAddresses
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeTags
+                Resource: "*"
+
+              - Sid: S3ListBuckets
+                Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                Resource: "*"
+
+              - Sid: S3ReadCDCUBuckets
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetBucketPolicy
+                  - s3:GetBucketTagging
+                  - s3:GetBucketVersioning
+                  - s3:GetBucketAcl
+                  - s3:ListBucket
+                Resource:
+                  - "arn:aws:s3:::*cdcu*"
+
+              - Sid: S3ReadCDCUObjects
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - "arn:aws:s3:::*cdcu*/*"
+
+        - PolicyName: CloudEngineerIAMReadOnlyInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: IAMListAccess
+                Effect: Allow
+                Action:
+                  - iam:ListUsers
+                  - iam:ListGroups
+                  - iam:ListPolicies
+                  - iam:ListAttachedGroupPolicies
+                  - iam:ListGroupPolicies
+                  - iam:ListEntitiesForPolicy
+                  - iam:ListPolicyVersions
+                  - iam:GetAccountSummary
+                Resource: "*"
+
+              - Sid: IAMReadSPUsers
+                Effect: Allow
+                Action:
+                  - iam:GetUser
+                  - iam:ListAttachedUserPolicies
+                  - iam:ListUserPolicies
+                  - iam:ListGroupsForUser
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/sp-*"
+
+              - Sid: IAMReadSPAndCDCUGroups
+                Effect: Allow
+                Action:
+                  - iam:GetGroup
+                  - iam:GetGroupPolicy
+                  - iam:ListAttachedGroupPolicies
+                  - iam:ListGroupPolicies
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/sp-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/*cdcu*"
+
+              - Sid: IAMReadSPAndCDCUPolicies
+                Effect: Allow
+                Action:
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:ListPolicyVersions
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/sp-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*cdcu*"
+
+  # CLOUD ENGINEERS CLOUD VALIDATORS GROUP
+  # S3 and VPC read-only validation group for CE users performing infra validation.
+  CDCUCloudEngineersCloudValidatorsGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-cloud-engineers-cv"
+      Policies:
+        - PolicyName: CloudEngineerS3ConsoleValidationInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3ConsoleDiscovery
+                Effect: Allow
+                Action:
+                  - s3:GetAccountPublicAccessBlock
+                  - s3:ListAccessPoints
+                  - s3:ListAllMyBuckets
+                Resource: "*"
+
+              - Sid: CDCUBucketMetadataRead
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetBucketNotification
+                  - s3:GetBucketPolicyStatus
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetBucketTagging
+                  - s3:GetBucketVersioning
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
+
+              - Sid: CDCUObjectMetadataRead
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectAcl
+                  - s3:GetObjectTagging
+                  - s3:GetObjectVersion
+                  - s3:ListMultipartUploadParts
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
+
         - PolicyName: CloudEngineerVPCViewInlinePolicy
           PolicyDocument:
             Version: "2012-10-17"
@@ -1350,101 +1485,25 @@ Resources:
                   - ec2:CreateNatGateway
                   - ec2:DeleteNatGateway
                 Resource: "*"
-        - PolicyName: CloudEngineerIAMReadOnlyInlinePolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: IAMListAccess
-                Effect: Allow
-                Action:
-                  - iam:ListUsers
-                  - iam:ListGroups
-                  - iam:ListPolicies
-                  - iam:ListAttachedGroupPolicies
-                  - iam:ListGroupPolicies
-                  - iam:ListEntitiesForPolicy
-                  - iam:ListPolicyVersions
-                  - iam:GetAccountSummary
 
-                Resource: "*"
-
-              - Sid: IAMReadSPUsers
-                Effect: Allow
-                Action:
-                  - iam:GetUser
-                  - iam:ListAttachedUserPolicies
-                  - iam:ListUserPolicies
-                  - iam:ListGroupsForUser
-
-                Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/sp-*"
-
-              - Sid: IAMReadSPAndCDCUGroups
-                Effect: Allow
-                Action:
-                  - iam:GetGroup
-                  - iam:GetGroupPolicy
-                  - iam:ListAttachedGroupPolicies
-                  - iam:ListGroupPolicies
-
-                Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/sp-*"
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:group/*cdcu*"
-
-              - Sid: IAMReadSPAndCDCUPolicies
-                Effect: Allow
-
-                Action:
-                  - iam:GetPolicy
-                  - iam:GetPolicyVersion
-                  - iam:ListPolicyVersions
-
-                Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/sp-*"
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:policy/*cdcu*"
-        - PolicyName: CloudEngineerS3ConsoleValidationInlinePolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: S3ConsoleDiscovery
-                Effect: Allow
-                Action:
-                  - s3:GetAccountPublicAccessBlock
-                  - s3:ListAccessPoints
-                  - s3:ListAllMyBuckets
-                Resource: "*"
-
-              - Sid: CDCUBucketMetadataRead
-                Effect: Allow
-                Action:
-                  - s3:GetBucketAcl
-                  - s3:GetBucketLocation
-                  - s3:GetBucketNotification
-                  - s3:GetBucketPolicyStatus
-                  - s3:GetBucketPublicAccessBlock
-                  - s3:GetBucketTagging
-                  - s3:GetBucketVersioning
-                  - s3:ListBucket
-                  - s3:ListBucketMultipartUploads
-                Resource:
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}"
-
-              - Sid: CDCUObjectMetadataRead
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectAcl
-                  - s3:GetObjectTagging
-                  - s3:GetObjectVersion
-                  - s3:ListMultipartUploadParts
-                Resource:
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results/*"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}/*"
-                  - !Sub "arn:aws:s3:::cdcu-${Environment}-athena-results-${RegionSuffix}/*"
+  # CLOUD ENGINEER GROUP
+  # CE receives infrastructure/service visibility and operational validation
+  # policies, but no broad human PassRole. Terraform or a future pipeline role
+  # should perform create/update operations that require passing execution roles.
+  CDCUCloudEngineersGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub "${Environment}-cdcu-cloud-engineers"
+      ManagedPolicyArns:
+        - !Ref CDCUGlobalSecurityPolicy
+        - !Ref CDCUDeveloperPolicy
+        - !Ref CDCUCodePipelinePolicy
+        - !Ref CDCUSageMakerPolicy
+        - !Ref CDCUAthenaPolicy
+        - !Ref CDCUSecretsManagerPolicy
+        - !Ref CDCUGluePolicy
+        - arn:aws:iam::aws:policy/AmazonQDeveloperAccess
+      Policies:
         # CODEPIPELINE
         - PolicyName: CloudEngineerCodePipelineInlinePolicy
           PolicyDocument:
@@ -1545,12 +1604,12 @@ Resources:
         - !Ref CDCUGlobalSecurityPolicy
         - !Ref CDCUDeveloperPolicy
         - !Ref CDCUSageMakerPolicy
-        - !Ref CDCUDataEngineerSageMakerPassRolePolicy
-        - !Ref CDCUDataEngineerGluePassRolePolicy
+        - !Ref CDCUDataEngineerPassRolePolicy
         - !Ref CDCUAthenaPolicy
         - !Ref CDCUSecretsManagerPolicy
         - !Ref CDCUGluePolicy
         - !Ref CDCUDataEngineeringAccessPatchPolicy
+        - !Ref CDCUDataEngineeringOptionalAccessPolicy
         - arn:aws:iam::aws:policy/AmazonQDeveloperAccess
       Policies:
         - PolicyName: DataEngineerNetworkTroubleshootingInlinePolicy
@@ -1851,14 +1910,14 @@ Outputs:
   ReleaseManagersGroup:
     Value: !Ref CDCUReleaseManagersGroup
 
-  DataEngineerSageMakerPassRolePolicyArn:
-    Value: !Ref CDCUDataEngineerSageMakerPassRolePolicy
-
-  DataEngineerGluePassRolePolicyArn:
-    Value: !Ref CDCUDataEngineerGluePassRolePolicy
+  DataEngineerPassRolePolicyArn:
+    Value: !Ref CDCUDataEngineerPassRolePolicy
 
   DataEngineeringAccessPatchPolicyArn:
     Value: !Ref CDCUDataEngineeringAccessPatchPolicy
+
+  DataEngineeringOptionalAccessPolicyArn:
+    Value: !Ref CDCUDataEngineeringOptionalAccessPolicy
 
   DataEngineeringGlueStudioScriptPermissionsIncluded:
     Value: !Ref IncludeGlueStudioScriptPermissions
@@ -1884,3 +1943,9 @@ Outputs:
 
   TerraformOperatorsGroup:
     Value: !Ref CDCUTerraformOperatorsGroup
+
+  CloudEngineersTemporaryAccessGroup:
+    Value: !Ref CDCUCloudEngineersTemporaryAccessGroup
+
+  CloudEngineersCloudValidatorsGroup:
+    Value: !Ref CDCUCloudEngineersCloudValidatorsGroup

@@ -956,12 +956,25 @@ resource "aws_iam_policy" "de_cloudwatch" {
   tags = var.tags
 }
 
-resource "aws_iam_policy" "de_glue_passrole" {
-  name = "ST-CDCU-${local.env}-DEGluePassRole"
-
+resource "aws_iam_policy" "de_passrole" {
+  name = "ST-CDCU-${local.env}-DEPassRole"
+  # Merged SageMaker + Glue PassRole into one policy to stay under the
+  # 10-policy-per-group AWS limit. Mirrors CDCUDataEngineerPassRolePolicy
+  # in cdcu-access.yaml. Each service PassRole is a separate Sid.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      {
+        Sid    = "AllowOnlyApprovedSageMakerExecutionRoles"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "sagemaker.amazonaws.com"
+          }
+        }
+      },
       {
         Sid    = "AllowOnlyApprovedGlueExecutionRoles"
         Effect = "Allow"
@@ -974,7 +987,7 @@ resource "aws_iam_policy" "de_glue_passrole" {
         }
       },
       {
-        Sid    = "GlueExecutionRoleRead"
+        Sid    = "ExecutionRoleRead"
         Effect = "Allow"
         Action = [
           "iam:GetRole",
@@ -982,7 +995,10 @@ resource "aws_iam_policy" "de_glue_passrole" {
           "iam:ListAttachedRolePolicies",
           "iam:ListRolePolicies"
         ]
-        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole"
+        Resource = [
+          "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole",
+          "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
+        ]
       }
     ]
   })
@@ -1052,9 +1068,9 @@ resource "aws_iam_group_policy_attachment" "de_cloudwatch" {
   policy_arn = aws_iam_policy.de_cloudwatch.arn
 }
 
-resource "aws_iam_group_policy_attachment" "de_glue_passrole" {
+resource "aws_iam_group_policy_attachment" "de_passrole" {
   group      = aws_iam_group.data_engineering.name
-  policy_arn = aws_iam_policy.de_glue_passrole.arn
+  policy_arn = aws_iam_policy.de_passrole.arn
 }
 
 resource "aws_iam_group_policy_attachment" "de_glue_console" {

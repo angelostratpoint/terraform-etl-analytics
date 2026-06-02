@@ -521,7 +521,11 @@ Resources:
               - athena:GetQueryResultsStream
               - athena:StopQueryExecution
               - athena:ListQueryExecutions
+              - athena:BatchGetNamedQuery
+              - athena:GetNamedQuery
               - athena:ListNamedQueries
+              - athena:CreateNamedQuery
+              - athena:DeleteNamedQuery
               - athena:GetWorkGroup
             Resource:
               - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdcu-${Environment}-workgroup"

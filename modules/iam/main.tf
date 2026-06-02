@@ -201,7 +201,7 @@ resource "aws_iam_policy" "glue_etl" {
         Action = [
           "glue:GetConnection", "glue:GetConnections", "glue:CreateConnection", "glue:UpdateConnection",
           "glue:DeleteConnection", "glue:GetSecurityConfiguration", "glue:GetSecurityConfigurations",
-          "glue:GetTags"
+          "glue:GetTags", "glue:TestConnection"
         ]
         Resource = "*"
       },
@@ -579,6 +579,11 @@ resource "aws_iam_policy" "athena_access" {
           "athena:GetQueryResults",
           "athena:StopQueryExecution",
           "athena:ListQueryExecutions",
+          "athena:BatchGetNamedQuery",
+          "athena:GetNamedQuery",
+          "athena:ListNamedQueries",
+          "athena:CreateNamedQuery",
+          "athena:DeleteNamedQuery",
           "athena:GetWorkGroup"
         ]
         Resource = "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${var.athena_workgroup_name}"

@@ -814,10 +814,14 @@ Resources:
               - glue:CreateTable
               - glue:UpdateTable
               - glue:DeleteTable
+              - glue:CreatePartition
+              - glue:UpdatePartition
+              - glue:DeletePartition
               - glue:GetPartition
               - glue:GetPartitions
               - glue:BatchGetPartition
               - glue:BatchCreatePartition
+              - glue:BatchUpdatePartition
               - glue:BatchDeletePartition
               - glue:CreateScript
               - glue:GetScript
@@ -897,6 +901,15 @@ Resources:
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/cdcu-${Environment}-*"
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:connection/glue-test-*"
+
+          - Sid: GlueTestConnectionConsoleCompatibility
+            Effect: Allow
+            Action:
+              - glue:TestConnection
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref AWS::Region
 
           - Sid: GlueVPCRead
             Effect: Allow
@@ -995,13 +1008,26 @@ Resources:
               - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"
               - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}/*"
 
+          - Sid: S3GlueStudioAssetsBucketCreateAccess
+            Effect: Allow
+            Action:
+              - s3:CreateBucket
+            Resource:
+              - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"
+            Condition:
+              StringEquals:
+                s3:LocationConstraint: !Ref AWS::Region
+
           - Sid: GlueCDCUCatalogAccess
             Effect: Allow
             Action:
               - glue:BatchCreatePartition
               - glue:BatchDeletePartition
               - glue:BatchGetPartition
+              - glue:BatchUpdatePartition
+              - glue:CreatePartition
               - glue:CreateTable
+              - glue:DeletePartition
               - glue:GetDatabase
               - glue:GetDatabases
               - glue:GetPartition
@@ -1010,6 +1036,7 @@ Resources:
               - glue:GetTables
               - glue:SearchTables
               - glue:GetConnections
+              - glue:UpdatePartition
               - glue:UpdateTable
             Resource:
               - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
@@ -1579,8 +1606,31 @@ Resources:
                   - events:DeleteRule
                   - events:RemoveTargets
                   - events:DescribeRule
+                  - events:EnableRule
+                  - events:DisableRule
+                  - events:ListTargetsByRule
+                  - events:TagResource
+                  - events:UntagResource
                 Resource:
                   - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
+
+              - Sid: EventBridgePipelineRuleDiscovery
+                Effect: Allow
+                Action:
+                  - events:DescribeEventBus
+                  - events:ListEventBuses
+                  - events:ListRuleNamesByTarget
+                  - events:ListRules
+                Resource: "*"
+
+              - Sid: CDCUDataLakeEventNotificationAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketNotification
+                  - s3:PutBucketNotification
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
 
               # REQUIRED FOR CODEPIPELINE / CODEBUILD
               - Sid: IAMPassRoleForPipeline
@@ -1664,17 +1714,30 @@ Resources:
                   - events:DeleteRule
                   - events:RemoveTargets
                   - events:ListTargetsByRule
+                  - events:TagResource
+                  - events:UntagResource
                 Resource:
                   - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
 
               - Sid: EventBridgeCrawlerTriggerDiscovery
                 Effect: Allow
                 Action:
+                  - events:DescribeEventBus
+                  - events:ListRuleNamesByTarget
                   - events:ListRules
                   - events:ListEventBuses
                   - scheduler:ListSchedules
                   - scheduler:ListScheduleGroups
                 Resource: "*"
+
+              - Sid: CDCUDataLakeEventNotificationAccess
+                Effect: Allow
+                Action:
+                  - s3:GetBucketNotification
+                  - s3:PutBucketNotification
+                Resource:
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+                  - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
 
   # DEVELOPER GROUP
   CDCUDevelopersGroup:
@@ -1700,12 +1763,16 @@ Resources:
                   - events:DeleteRule
                   - events:RemoveTargets
                   - events:ListTargetsByRule
+                  - events:TagResource
+                  - events:UntagResource
                 Resource:
                   - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/cdcu-${Environment}-*"
 
               - Sid: EventBridgeDiscovery
                 Effect: Allow
                 Action:
+                  - events:DescribeEventBus
+                  - events:ListRuleNamesByTarget
                   - events:ListRules
                   - events:ListEventBuses
                   - scheduler:ListSchedules

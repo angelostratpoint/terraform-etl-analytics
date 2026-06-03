@@ -114,9 +114,24 @@ resource "aws_iam_policy" "glue_s3" {
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
-          "s3:GetBucketVersioning"
+          "s3:GetBucketNotification",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketNotification"
         ]
         Resource = var.data_lake_bucket_arn
+      },
+      {
+        Sid    = "S3GlueAssetsBucketCreateAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket"
+        ]
+        Resource = local.glue_assets_bucket_arn
+        Condition = {
+          StringEquals = {
+            "s3:LocationConstraint" = local.region
+          }
+        }
       },
       {
         Sid    = "S3GlueAssetsBucketReadAccess"
@@ -213,6 +228,34 @@ resource "aws_iam_policy" "glue_etl" {
           "glue:CreateScript", "glue:GetScript", "glue:GetDataflowGraph"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "EventBridgeCrawlerRuleDiscovery"
+        Effect = "Allow"
+        Action = [
+          "events:DescribeEventBus",
+          "events:ListEventBuses",
+          "events:ListRuleNamesByTarget",
+          "events:ListRules",
+          "events:ListTargetsByRule"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EventBridgeCrawlerRules"
+        Effect = "Allow"
+        Action = [
+          "events:DeleteRule",
+          "events:DescribeRule",
+          "events:DisableRule",
+          "events:EnableRule",
+          "events:PutRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:TagResource",
+          "events:UntagResource"
+        ]
+        Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-${local.env}-*"
       },
       {
         # AWS does not support resource-level restrictions for these actions.

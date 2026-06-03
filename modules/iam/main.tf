@@ -154,7 +154,8 @@ resource "aws_iam_policy" "glue_etl" {
         Action = [
           "glue:GetDatabase", "glue:GetDatabases", "glue:CreateDatabase", "glue:UpdateDatabase",
           "glue:GetTable", "glue:GetTables", "glue:SearchTables", "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
-          "glue:GetPartition", "glue:GetPartitions", "glue:BatchCreatePartition", "glue:BatchDeletePartition",
+          "glue:GetPartition", "glue:GetPartitions", "glue:CreatePartition", "glue:UpdatePartition", "glue:DeletePartition",
+          "glue:BatchCreatePartition", "glue:BatchUpdatePartition", "glue:BatchDeletePartition",
           "glue:BatchGetPartition", "glue:GetCatalogImportStatus"
         ]
         Resource = [

@@ -860,14 +860,36 @@ Resources:
             # These actions have no resource-level restriction in IAM - AWS requires Resource '*'.
             # glue:GetCrawlerMetrics on '*' is needed for the Glue console crawlers list page.
             # glue:ListSchemas/GetRegistry on '*' is needed for the Schema Registry panel.
-            # cloudwatch:GetMetricStatistics on '*' is needed for Glue job metrics graphs.
+            # CloudWatch metric reads on '*' are needed for Glue job monitoring graphs.
             Effect: Allow
             Action:
               - glue:GetCrawlerMetrics
               - glue:ListSchemas
               - glue:GetRegistry
               - glue:ListRegistries
+              - cloudwatch:GetMetricData
               - cloudwatch:GetMetricStatistics
+              - cloudwatch:ListMetrics
+            Resource: "*"
+
+          - Sid: GlueJobRunMonitoringConsoleRead
+            # Glue job run monitoring is an account-level console dashboard and
+            # requires wildcard read access for summary widgets.
+            Effect: Allow
+            Action:
+              - glue:BatchGetJobs
+              - glue:GetCrawler
+              - glue:GetCrawlerMetrics
+              - glue:GetCrawlers
+              - glue:GetJob
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:GetJobs
+              - glue:GetTrigger
+              - glue:GetTriggers
+              - glue:GetWorkflow
+              - glue:GetWorkflowRun
+              - glue:GetWorkflowRuns
             Resource: "*"
 
           - Sid: CDCUJobs
@@ -1000,9 +1022,11 @@ Resources:
             Action:
               - s3:AbortMultipartUpload
               - s3:GetBucketLocation
+              - s3:GetBucketPublicAccessBlock
               - s3:GetObject
               - s3:ListBucket
               - s3:ListMultipartUploadParts
+              - s3:PutBucketPublicAccessBlock
               - s3:PutObject
             Resource:
               - !Sub "arn:aws:s3:::aws-glue-assets-${AWS::AccountId}-${AWS::Region}"

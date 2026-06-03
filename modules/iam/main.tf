@@ -137,7 +137,9 @@ resource "aws_iam_policy" "glue_s3" {
         Sid    = "S3GlueAssetsBucketReadAccess"
         Effect = "Allow"
         Action = [
-          "s3:ListBucket"
+          "s3:GetBucketPublicAccessBlock",
+          "s3:ListBucket",
+          "s3:PutBucketPublicAccessBlock"
         ]
         Resource = local.glue_assets_bucket_arn
       },

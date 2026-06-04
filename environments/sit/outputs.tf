@@ -29,6 +29,7 @@ output "external_role_arns" {
     glue_execution      = module.iam.glue_execution_role_arn
     sagemaker_execution = module.iam.sagemaker_execution_role_arn
     athena_query        = module.iam.athena_query_role_arn
+    eventbridge_glue    = module.iam.eventbridge_glue_role_arn
     quicksight_access   = var.existing_quicksight_access_role_arn
   }
 }
@@ -41,6 +42,11 @@ output "glue_execution_role_arn" {
 output "sagemaker_execution_role_arn" {
   description = "ST-CDCU SageMaker execution role ARN"
   value       = module.iam.sagemaker_execution_role_arn
+}
+
+output "eventbridge_glue_role_arn" {
+  description = "ST-CDCU EventBridge Glue invocation role ARN"
+  value       = module.iam.eventbridge_glue_role_arn
 }
 
 output "iam_groups" {

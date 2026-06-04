@@ -28,6 +28,16 @@ output "athena_query_role_name" {
   value       = aws_iam_role.athena_query.name
 }
 
+output "eventbridge_glue_role_arn" {
+  description = "ARN of the ST-CDCU EventBridge Glue invocation role"
+  value       = aws_iam_role.eventbridge_glue.arn
+}
+
+output "eventbridge_glue_role_name" {
+  description = "Name of the ST-CDCU EventBridge Glue invocation role"
+  value       = aws_iam_role.eventbridge_glue.name
+}
+
 output "cloud_engineering_group_name" {
   description = "Name of the ST-CDCU Cloud Engineering IAM group"
   value       = aws_iam_group.cloud_engineering.name

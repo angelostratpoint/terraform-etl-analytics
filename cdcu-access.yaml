@@ -748,6 +748,17 @@ Resources:
                 iam:PassedToService:
                   - glue.amazonaws.com
 
+          - Sid: AllowOnlyApprovedEventBridgeGlueRoles
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-EventBridgeGlueRole"
+            Condition:
+              StringEquals:
+                iam:PassedToService:
+                  - events.amazonaws.com
+
   # TERRAFORM BACKEND POLICY
   # Optional and intentionally not attached to CE/DE/QA by default. Attach only to
   # an approved Terraform operator group/role if BPI-MS allows Stratpoint to run Terraform.
@@ -1668,6 +1679,17 @@ Resources:
                     iam:PassedToService:
                       - codepipeline.amazonaws.com
                       - codebuild.amazonaws.com
+
+              - Sid: IAMPassRoleForEventBridgeGlue
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/ST-CDCU-${Environment}-EventBridgeGlueRole"
+                Condition:
+                  StringEquals:
+                    iam:PassedToService:
+                      - events.amazonaws.com
 
   # DATA ENGINEERS GROUP
   # DE receives SageMaker Studio, Athena, Glue, Secrets read, the scoped

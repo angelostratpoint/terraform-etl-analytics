@@ -704,6 +704,77 @@ resource "aws_iam_role_policy_attachment" "athena_deny" {
 }
 
 ###############################################################################
+# ST-CDCU-EventBridgeGlueRole
+###############################################################################
+
+resource "aws_iam_role" "eventbridge_glue" {
+  name        = "ST-CDCU-${local.env}-EventBridgeGlueRole"
+  description = "Execution role for EventBridge rules that invoke CDCU Glue and SageMaker targets"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = merge(var.tags, { Name = "ST-CDCU-${local.env}-EventBridgeGlueRole" })
+}
+
+resource "aws_iam_policy" "eventbridge_glue" {
+  name        = "ST-CDCU-${local.env}-EventBridgeGlueAccess"
+  description = "Allows EventBridge to start approved CDCU Glue crawlers/jobs and SageMaker processing jobs"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EventBridgeGlueTargets"
+        Effect = "Allow"
+        Action = [
+          "glue:StartCrawler",
+          "glue:StartJobRun"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-${local.env}-*",
+          "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-${local.env}-*"
+        ]
+      },
+      {
+        Sid    = "EventBridgeSageMakerProcessingTargets"
+        Effect = "Allow"
+        Action = [
+          "sagemaker:CreateProcessingJob"
+        ]
+        Resource = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-${local.env}-*"
+      },
+      {
+        Sid    = "EventBridgePassSageMakerExecutionRole"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "sagemaker.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "eventbridge_glue" {
+  role       = aws_iam_role.eventbridge_glue.name
+  policy_arn = aws_iam_policy.eventbridge_glue.arn
+}
+
+###############################################################################
 # ST-CDCU-CloudEngineering Group
 ###############################################################################
 
@@ -767,6 +838,19 @@ resource "aws_iam_policy" "ce_eventbridge" {
           "events:RemoveTargets"
         ]
         NotResource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
+      },
+      {
+        Sid    = "EventBridgeGluePassRole"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-EventBridgeGlueRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "events.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -1038,6 +1122,17 @@ resource "aws_iam_policy" "de_passrole" {
         }
       },
       {
+        Sid    = "AllowOnlyApprovedEventBridgeGlueRoles"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-EventBridgeGlueRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "events.amazonaws.com"
+          }
+        }
+      },
+      {
         Sid    = "ExecutionRoleRead"
         Effect = "Allow"
         Action = [
@@ -1048,7 +1143,8 @@ resource "aws_iam_policy" "de_passrole" {
         ]
         Resource = [
           "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole",
-          "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
+          "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole",
+          "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-EventBridgeGlueRole"
         ]
       }
     ]

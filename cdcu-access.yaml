@@ -870,7 +870,8 @@ Resources:
           - Sid: GlueStudioConsoleWildcard
             # These actions have no resource-level restriction in IAM - AWS requires Resource '*'.
             # glue:GetCrawlerMetrics on '*' is needed for the Glue console crawlers list page.
-            # glue:ListSchemas/GetRegistry on '*' is needed for the Schema Registry panel.
+            # glue:ListSchemas/GetRegistry and schemas:* read actions on '*' are needed
+            # for the EventBridge Schema Registry panel.
             # CloudWatch metric reads on '*' are needed for Glue job monitoring graphs.
             Effect: Allow
             Action:
@@ -878,6 +879,11 @@ Resources:
               - glue:ListSchemas
               - glue:GetRegistry
               - glue:ListRegistries
+              - schemas:ListRegistries
+              - schemas:ListSchemas
+              - schemas:DescribeRegistry
+              - schemas:DescribeSchema
+              - schemas:SearchSchemas
               - cloudwatch:GetMetricData
               - cloudwatch:GetMetricStatistics
               - cloudwatch:ListMetrics
@@ -1774,6 +1780,11 @@ Resources:
                   - events:ListEventBuses
                   - scheduler:ListSchedules
                   - scheduler:ListScheduleGroups
+                  - schemas:ListRegistries
+                  - schemas:ListSchemas
+                  - schemas:DescribeRegistry
+                  - schemas:DescribeSchema
+                  - schemas:SearchSchemas
                 Resource: "*"
 
               - Sid: CDCUDataLakeEventNotificationAccess
@@ -1823,6 +1834,11 @@ Resources:
                   - events:ListEventBuses
                   - scheduler:ListSchedules
                   - scheduler:ListScheduleGroups
+                  - schemas:ListRegistries
+                  - schemas:ListSchemas
+                  - schemas:DescribeRegistry
+                  - schemas:DescribeSchema
+                  - schemas:SearchSchemas
                 Resource: "*"
 
   # QA GROUP

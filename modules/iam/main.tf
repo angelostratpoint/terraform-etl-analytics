@@ -239,7 +239,12 @@ resource "aws_iam_policy" "glue_etl" {
           "events:ListEventBuses",
           "events:ListRuleNamesByTarget",
           "events:ListRules",
-          "events:ListTargetsByRule"
+          "events:ListTargetsByRule",
+          "schemas:ListRegistries",
+          "schemas:ListSchemas",
+          "schemas:DescribeRegistry",
+          "schemas:DescribeSchema",
+          "schemas:SearchSchemas"
         ]
         Resource = "*"
       },
@@ -266,6 +271,7 @@ resource "aws_iam_policy" "glue_etl" {
         Action = [
           "glue:GetCrawlerMetrics",
           "glue:ListSchemas", "glue:GetRegistry", "glue:ListRegistries",
+          "schemas:ListRegistries", "schemas:ListSchemas", "schemas:DescribeRegistry", "schemas:DescribeSchema", "schemas:SearchSchemas",
           "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"
         ]
         Resource = "*"
@@ -825,6 +831,18 @@ resource "aws_iam_policy" "ce_eventbridge" {
           "events:ListTargetsByRule"
         ]
         Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-*"
+      },
+      {
+        Sid    = "EventBridgeSchemaDiscovery"
+        Effect = "Allow"
+        Action = [
+          "schemas:ListRegistries",
+          "schemas:ListSchemas",
+          "schemas:DescribeRegistry",
+          "schemas:DescribeSchema",
+          "schemas:SearchSchemas"
+        ]
+        Resource = "*"
       },
       {
         Sid    = "DenyNonCDCUEventBridgeRuleMutation"

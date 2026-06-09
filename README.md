@@ -18,7 +18,9 @@ The May 2026 BPI-MS review confirmed the target operating model below:
 - BPI-MS will review/approve IAM policy resources by group: Cloud Engineering, Data Engineering, and QA.
 - BPI-MS owns VPC, route table, security group, endpoint, and RDS/MySQL governance. The optional `vpc-assessment.yaml` template is provided for BPI-MS-controlled network prerequisite provisioning.
 - Terraform should provision CDCU Secrets Manager secret containers using the approved names, but must not store or commit secret values.
-- Lake Formation is required when enabled by BPI-MS; CDCU-scoped Lake Formation grants should be added in a later Terraform phase.
+- Lake Formation is required when enabled by BPI-MS. The access template
+  contains CDCU-scoped grants when the approved runtime principals are
+  supplied; account-level Lake Formation governance remains with BPI-MS.
 - CodePipeline access for Cloud Engineering is later scope and is not required for the current Phase 1 package.
 
 ## Terraform Scope
@@ -88,6 +90,13 @@ Use the retained BPI-MS handoff guides for setup and deployment:
 |---|---|
 | `docs/bootstrap-guide.md` | Creates or verifies the Terraform S3 state bucket and DynamoDB lock table |
 | `docs/deployment-guide.md` | Describes required BPI-MS inputs and the SIT/UAT/Prod Terraform run flow |
+| `docs/terraform-vpc-production-readiness.md` | Detailed Terraform architecture, `vpc-assessment.yaml`, ownership boundaries, and production-readiness checklist |
+| `docs/iam-service-role-reference.md` | Current human group, service role, PassRole, Lake Formation, and IAM validation reference |
+| `docs/runtime-connectivity-validation.md` | Runtime connectivity and service smoke tests |
+
+For production technical review, start with
+`docs/terraform-vpc-production-readiness.md`. IAM user/group documentation is
+summarized separately in `docs/iam-service-role-reference.md`.
 
 ## Required External Inputs
 
@@ -172,3 +181,17 @@ terraform apply tfplan
 ```
 
 UAT and production use the same flow from `environments/uat` and `environments/prod`. Production requires the prod GitHub environment approval gate for CI/CD applies if CI/CD is enabled later.
+
+## Production Review Notes
+
+The lower-environment values embedded as defaults or examples must not be
+reused automatically for production. BPI-MS must provide or approve the
+production VPC, subnet CIDRs, route table, RDS security group, S3 prefix list,
+KMS key, backend, bucket names, and deployment role.
+
+Terraform uses one Glue catalog database per environment:
+`cdcu_{environment}_catalog`. The SIT `cdcu_standardized_db` database is a
+legacy Employee test resource and is not created by the Glue Terraform module.
+Current standardized output is cataloged in `cdcu_sit_catalog` from the
+`standardized/merged/` S3 prefix. The legacy database must not be promoted to
+UAT or production.

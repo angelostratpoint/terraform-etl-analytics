@@ -1,5 +1,11 @@
 # CDCU Terraform Deployment Guide
 
+For the consolidated Terraform architecture, `vpc-assessment.yaml` resource
+breakdown, ownership boundary, and production-readiness checklist, also review
+[`terraform-vpc-production-readiness.md`](terraform-vpc-production-readiness.md).
+For the current human group, runtime role, PassRole, and Lake Formation access
+model, review [`iam-service-role-reference.md`](iam-service-role-reference.md).
+
 This repository provisions the CDCU Terraform-managed service layer for BPI-MS.
 It is organized into separate environment roots for SIT, UAT, and production.
 

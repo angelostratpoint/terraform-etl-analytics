@@ -202,8 +202,8 @@ variable "sagemaker_notebook_root_access" {
   default     = "Disabled"
 }
 
-# Disabled by default — validate QuickSight access model in sandbox before enabling.
-# See docs/errors-and-resolutions.md Error 24 for context.
+# Disabled by default. Validate the target account's QuickSight access model before enabling.
+# Enable only after the target account has an approved QuickSight subscription and owner principal.
 variable "enable_quicksight" {
   description = "Whether to provision QuickSight data source and dataset resources"
   type        = bool

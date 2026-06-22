@@ -14,6 +14,8 @@ locals {
   glue_crawler_arn       = "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-*"
   glue_job_arn           = "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-*"
   glue_connection_arn    = "arn:aws:glue:${local.region}:${local.account_id}:connection/cdcu-*"
+  glue_trigger_arn       = "arn:aws:glue:${local.region}:${local.account_id}:trigger/cdcu-*"
+  glue_workflow_arn      = "arn:aws:glue:${local.region}:${local.account_id}:workflow/cdcu-*"
   glue_assets_bucket_arn = "arn:aws:s3:::aws-glue-assets-${local.account_id}-${local.region}"
 
   sagemaker_processing_job_arn  = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-*"
@@ -227,7 +229,7 @@ resource "aws_iam_policy" "glue_etl" {
         Sid    = "GlueStudioScriptAndVisualEditor"
         Effect = "Allow"
         Action = [
-          "glue:CreateScript", "glue:GetScript", "glue:GetDataflowGraph"
+          "glue:CreateScript", "glue:GetDataflowGraph"
         ]
         Resource = "*"
       },
@@ -1198,6 +1200,112 @@ resource "aws_iam_policy" "de_glue_console" {
   tags = var.tags
 }
 
+resource "aws_iam_group_policy" "de_glue_orchestration" {
+  name  = "DataEngineerGlueWorkflowTriggerInlinePolicy"
+  group = aws_iam_group.data_engineering.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "GlueWorkflowTriggerScopedAccess"
+        Effect = "Allow"
+        Action = [
+          "glue:CreateTrigger",
+          "glue:UpdateTrigger",
+          "glue:DeleteTrigger",
+          "glue:StartTrigger",
+          "glue:StopTrigger",
+          "glue:CreateWorkflow",
+          "glue:UpdateWorkflow",
+          "glue:DeleteWorkflow",
+          "glue:StartWorkflowRun",
+          "glue:GetTags",
+          "glue:TagResource",
+          "glue:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:trigger/cdcu-${local.env}-*",
+          "arn:aws:glue:${local.region}:${local.account_id}:workflow/cdcu-${local.env}-*"
+        ]
+      },
+      {
+        Sid    = "GlueWorkflowTriggerDiscovery"
+        Effect = "Allow"
+        Action = [
+          "glue:GetTrigger",
+          "glue:GetTriggers",
+          "glue:BatchGetTriggers",
+          "glue:GetWorkflow",
+          "glue:GetWorkflows",
+          "glue:BatchGetWorkflows",
+          "glue:GetWorkflowRun",
+          "glue:GetWorkflowRuns"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_group_policy" "de_eventbridge_crawler_trigger" {
+  name  = "DataEngineerEventBridgeCrawlerTriggerInlinePolicy"
+  group = aws_iam_group.data_engineering.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EventBridgeCrawlerTriggerRules"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:DescribeRule",
+          "events:EnableRule",
+          "events:DisableRule",
+          "events:DeleteRule",
+          "events:RemoveTargets",
+          "events:ListTargetsByRule",
+          "events:TagResource",
+          "events:UntagResource"
+        ]
+        Resource = "arn:aws:events:${local.region}:${local.account_id}:rule/cdcu-${local.env}-*"
+      },
+      {
+        Sid    = "EventBridgeCrawlerTriggerDiscovery"
+        Effect = "Allow"
+        Action = [
+          "events:DescribeEventBus",
+          "events:ListRuleNamesByTarget",
+          "events:ListRules",
+          "events:ListEventBuses",
+          "scheduler:ListSchedules",
+          "scheduler:ListScheduleGroups",
+          "schemas:ListRegistries",
+          "schemas:ListSchemas",
+          "schemas:DescribeRegistry",
+          "schemas:DescribeSchema",
+          "schemas:SearchSchemas"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CDCUDataLakeEventNotificationAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketNotification",
+          "s3:PutBucketNotification"
+        ]
+        Resource = [
+          "arn:aws:s3:::cdcu-${local.env}-data-lake",
+          "arn:aws:s3:::cdcu-${local.env}-data-lake-apse1"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_group_policy_attachment" "de_glue_s3" {
   group      = aws_iam_group.data_engineering.name
   policy_arn = aws_iam_policy.glue_s3.arn
@@ -1263,27 +1371,118 @@ resource "aws_iam_policy" "qa_access" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid      = "S3ConsoleBucketDiscovery"
+        Effect   = "Allow"
+        Action   = ["s3:ListAllMyBuckets"]
+        Resource = "*"
+      },
+      {
+        Sid    = "S3DataLakeValidationList"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
+        Resource = var.data_lake_bucket_arn
+      },
+      {
+        Sid    = "S3DataLakeValidationRead"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion"
+        ]
+        Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
         Sid      = "S3AthenaResultsRead"
         Effect   = "Allow"
-        Action   = ["s3:GetObject"]
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
         Resource = "${var.athena_results_bucket_arn}/*"
       },
       {
         Sid      = "S3AthenaResultsList"
         Effect   = "Allow"
-        Action   = ["s3:ListBucket"]
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
         Resource = var.athena_results_bucket_arn
       },
       {
         Sid    = "AthenaReadOnly"
         Effect = "Allow"
         Action = [
+          "athena:BatchGetQueryExecution",
+          "athena:StartQueryExecution",
           "athena:GetQueryExecution",
           "athena:GetQueryResults",
           "athena:ListQueryExecutions",
+          "athena:StopQueryExecution",
           "athena:GetWorkGroup"
         ]
         Resource = "arn:aws:athena:${local.region}:${local.account_id}:workgroup/${var.athena_workgroup_name}"
+      },
+      {
+        Sid    = "AthenaConsoleDiscovery"
+        Effect = "Allow"
+        Action = [
+          "athena:ListDataCatalogs",
+          "athena:ListWorkGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AthenaCatalogMetadataRead"
+        Effect = "Allow"
+        Action = [
+          "athena:GetDataCatalog",
+          "athena:GetTableMetadata",
+          "athena:ListDatabases",
+          "athena:ListTableMetadata"
+        ]
+        Resource = "arn:aws:athena:${local.region}:${local.account_id}:datacatalog/AwsDataCatalog"
+      },
+      {
+        Sid    = "GlueCatalogValidationRead"
+        Effect = "Allow"
+        Action = [
+          "glue:BatchGetPartition",
+          "glue:GetDatabase",
+          "glue:GetDatabases",
+          "glue:GetPartition",
+          "glue:GetPartitions",
+          "glue:GetTable",
+          "glue:GetTables",
+          "glue:SearchTables"
+        ]
+        Resource = [
+          "arn:aws:glue:${local.region}:${local.account_id}:catalog",
+          "arn:aws:glue:${local.region}:${local.account_id}:database/cdcu_${local.env}_catalog",
+          "arn:aws:glue:${local.region}:${local.account_id}:table/cdcu_${local.env}_catalog/*"
+        ]
+      },
+      {
+        Sid    = "QuickSightValidationReview"
+        Effect = "Allow"
+        Action = [
+          "quicksight:DescribeAnalysis",
+          "quicksight:DescribeDashboard",
+          "quicksight:DescribeDataSet",
+          "quicksight:DescribeDataSource",
+          "quicksight:DescribeGroup",
+          "quicksight:GenerateEmbedUrlForRegisteredUser",
+          "quicksight:GetDashboardEmbedUrl",
+          "quicksight:ListAnalyses",
+          "quicksight:ListDashboards",
+          "quicksight:ListDataSets",
+          "quicksight:ListDataSources",
+          "quicksight:ListGroups"
+        ]
+        Resource = "*"
       },
       {
         Sid    = "CloudWatchLogsRead"

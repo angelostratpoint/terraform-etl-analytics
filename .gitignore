@@ -68,3 +68,21 @@ venv/
 
 # Artifact placeholder files (keep READMEs, ignore .gitkeep in non-empty dirs)
 artifacts/**/.gitkeep
+
+# Codex sheet work (internal tooling, not for repo)
+.codex-sheet-work/
+
+# Agent working files
+.agents/
+
+# Sensitive/internal work outputs
+logs/
+outputs/
+scripts/
+privilege-results.txt
+
+# Excel and Office files
+*.xlsx
+*.xls
+*.docx
+*.pptx

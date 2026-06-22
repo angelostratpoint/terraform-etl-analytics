@@ -435,17 +435,77 @@ Resources:
           - Sid: AthenaValidationAccess
             Effect: Allow
             Action:
+              - athena:BatchGetQueryExecution
               - athena:StartQueryExecution
               - athena:GetQueryExecution
               - athena:GetQueryResults
+              - athena:ListQueryExecutions
               - athena:StopQueryExecution
               - athena:GetWorkGroup
             Resource:
               - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/cdcu-${Environment}-workgroup"
 
+          - Sid: AthenaConsoleDiscovery
+            Effect: Allow
+            Action:
+              - athena:ListDataCatalogs
+              - athena:ListWorkGroups
+            Resource: "*"
+
+          - Sid: AthenaCatalogMetadataRead
+            Effect: Allow
+            Action:
+              - athena:GetDataCatalog
+              - athena:GetTableMetadata
+              - athena:ListDatabases
+              - athena:ListTableMetadata
+            Resource:
+              - !Sub "arn:aws:athena:${AWS::Region}:${AWS::AccountId}:datacatalog/AwsDataCatalog"
+
+          - Sid: GlueCatalogValidationRead
+            Effect: Allow
+            Action:
+              - glue:BatchGetPartition
+              - glue:GetDatabase
+              - glue:GetDatabases
+              - glue:GetPartition
+              - glue:GetPartitions
+              - glue:GetTable
+              - glue:GetTables
+              - glue:SearchTables
+            Resource:
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/cdcu_${Environment}_catalog"
+              - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/cdcu_${Environment}_catalog/*"
+
+          - Sid: S3ConsoleBucketDiscovery
+            Effect: Allow
+            Action:
+              - s3:ListAllMyBuckets
+            Resource: "*"
+
+          - Sid: S3DataLakeValidationList
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1"
+
+          - Sid: S3DataLakeValidationRead
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+            Resource:
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake/*"
+              - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-apse1/*"
+
           - Sid: AthenaOutputBucket
             Effect: Allow
             Action:
+              - s3:GetBucketLocation
               - s3:GetObject
               - s3:PutObject
               - s3:ListBucket
@@ -835,7 +895,6 @@ Resources:
               - glue:BatchUpdatePartition
               - glue:BatchDeletePartition
               - glue:CreateScript
-              - glue:GetScript
               - glue:GetDataflowGraph
               - glue:DescribeInboundIntegrations
               - glue:GetTags
@@ -1142,7 +1201,6 @@ Resources:
               Effect: Allow
               Action:
                 - glue:CreateScript
-                - glue:GetScript
               Resource: "*"
             - !Ref AWS::NoValue
 
@@ -1749,6 +1807,42 @@ Resources:
                   - rds:DescribeDBSecurityGroups
                   - rds:DescribeDBParameterGroups
                   - rds:DescribeDBClusterParameterGroups
+                Resource: "*"
+
+        - PolicyName: DataEngineerGlueWorkflowTriggerInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: GlueWorkflowTriggerScopedAccess
+                Effect: Allow
+                Action:
+                  - glue:CreateTrigger
+                  - glue:UpdateTrigger
+                  - glue:DeleteTrigger
+                  - glue:StartTrigger
+                  - glue:StopTrigger
+                  - glue:CreateWorkflow
+                  - glue:UpdateWorkflow
+                  - glue:DeleteWorkflow
+                  - glue:StartWorkflowRun
+                  - glue:GetTags
+                  - glue:TagResource
+                  - glue:UntagResource
+                Resource:
+                  - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:trigger/cdcu-${Environment}-*"
+                  - !Sub "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:workflow/cdcu-${Environment}-*"
+
+              - Sid: GlueWorkflowTriggerDiscovery
+                Effect: Allow
+                Action:
+                  - glue:GetTrigger
+                  - glue:GetTriggers
+                  - glue:BatchGetTriggers
+                  - glue:GetWorkflow
+                  - glue:GetWorkflows
+                  - glue:BatchGetWorkflows
+                  - glue:GetWorkflowRun
+                  - glue:GetWorkflowRuns
                 Resource: "*"
 
         - PolicyName: DataEngineerEventBridgeCrawlerTriggerInlinePolicy

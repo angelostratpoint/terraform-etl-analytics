@@ -310,24 +310,37 @@ aws sts get-caller-identity
 # 2. Deploy or verify vpc-assessment.yaml in CloudFormation
 #    Then copy CDCUPrivateSubnetId and CDCURuntimeSecurityGroupId into terraform.tfvars.
 
-# 3. Go to the target Terraform root
+# 3. Deploy or verify cdcu-access.yaml in CloudFormation for human access.
+#    Confirm the command targets the same account and environment as Terraform.
+
+# 4. Go to the target Terraform root
 cd environments/sit
 
-# 4. Create and update terraform.tfvars
+# 5. Create and update terraform.tfvars
 Copy-Item terraform.tfvars.example terraform.tfvars
 notepad terraform.tfvars
 
-# 5. Initialize the backend
+# 6. Initialize the backend
 terraform init
 
-# 6. Validate and review the plan
+# 7. Validate and review the plan
 terraform fmt -check -recursive ../../
 terraform validate
 terraform plan -var-file="terraform.tfvars" -out=tfplan
 
-# 7. Apply only after the plan is reviewed and approved
+# 8. Apply only after the plan is reviewed and approved
 terraform apply tfplan
 ```
+
+`cdcu-access.yaml` and Terraform have different ownership boundaries:
+
+- `cdcu-access.yaml` manages environment human groups and policies such as
+  `sit-cdcu-qa-validation-policy`;
+- Terraform `modules/iam` manages runtime roles and secondary `ST-CDCU-*`
+  groups and policies.
+
+Running only `terraform apply` does not update the human QA, DE, or CE
+policies from `cdcu-access.yaml`.
 
 ## Post-Deployment Checks
 
@@ -348,6 +361,45 @@ aws athena get-work-group `
 ```
 
 Replace `sit` with `uat` or `prod` when validating another environment.
+
+For human-access changes, also verify the active policy document. For example:
+
+```powershell
+$PolicyArn = "arn:aws:iam::929350647322:policy/sit-cdcu-qa-validation-policy"
+$Version = aws iam get-policy `
+  --policy-arn $PolicyArn `
+  --query "Policy.DefaultVersionId" `
+  --output text
+
+aws iam get-policy-version `
+  --policy-arn $PolicyArn `
+  --version-id $Version `
+  --query "PolicyVersion.Document.Statement"
+```
+
+QA validation should confirm:
+
+- the Glue catalog database list is visible;
+- `cdcu_sit_catalog` or the target environment catalog is selectable;
+- CDCU data-lake buckets are visible and readable;
+- Athena queries can run in the CDCU workgroup;
+- Athena results are readable from the results bucket;
+- QuickSight Reader access and asset sharing are configured when QuickSight
+  validation is required.
+
+If Athena reports `Unable to verify/create output bucket`, confirm:
+
+- the workgroup output location uses the correct environment results bucket;
+- the bucket exists in `ap-southeast-1`;
+- the QA policy grants `s3:GetBucketLocation` and `s3:ListBucket` on the
+  bucket;
+- the QA policy grants `s3:GetObject` and `s3:PutObject` on the configured
+  query-results prefix;
+- the bucket policy does not deny HTTPS requests;
+- KMS permissions are present only when the workgroup or bucket uses SSE-KMS.
+
+Do not grant QA `s3:CreateBucket` when the approved results bucket already
+exists.
 
 ## Runtime Validation
 
@@ -374,6 +426,118 @@ DE-owned scripts are uploaded from the repository when matching files exist:
 
 Empty script folders produce zero uploaded objects. That is expected until the
 approved runtime scripts are added.
+
+## SageMaker Package Wheelhouse Deployment
+
+The validated SIT package bundle is stored at:
+
+```text
+s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/
+```
+
+It contains the pinned requirements and required wheel dependencies for the
+validated Python 3.12 Linux x86_64 SageMaker runtime. UAT and production should
+not enable internet egress for pip installation. Promote the approved bundle
+to the target account and install from a local SageMaker copy.
+
+### 1. Validate the SIT bundle without internet package resolution
+
+```bash
+rm -rf /tmp/cdcu-wheelhouse-test
+mkdir -p /tmp/cdcu-wheelhouse-test
+
+aws s3 sync \
+  s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/ \
+  /tmp/cdcu-wheelhouse-test/
+
+python -m pip install \
+  --no-index \
+  --find-links /tmp/cdcu-wheelhouse-test \
+  -r /tmp/cdcu-wheelhouse-test/requirements.txt
+```
+
+The install passes only when pip resolves every requirement from the local
+wheelhouse and does not contact PyPI.
+
+### 2. Promote to UAT using separate account profiles
+
+```bash
+set -e
+
+STAGING_DIR="$HOME/cdcu-python-wheelhouse"
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
+
+aws s3 sync \
+  s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/ \
+  "$STAGING_DIR/" \
+  --profile bpims-dev \
+  --exact-timestamps
+
+find "$STAGING_DIR" -type f ! -name SHA256SUMS -print |
+  sort |
+  while IFS= read -r file; do shasum -a 256 "$file"; done \
+  > "$STAGING_DIR/SHA256SUMS"
+
+aws s3 sync \
+  "$STAGING_DIR/" \
+  s3://cdcu-uat-data-lake/artifacts/python-wheelhouse/ \
+  --profile bpims-core-uat \
+  --exact-timestamps
+```
+
+Direct bucket-to-bucket sync requires one principal with source read and
+destination write access. The local staging process is the default because SIT
+and UAT are separate AWS accounts.
+
+### 3. Install offline in UAT SageMaker
+
+```bash
+rm -rf /tmp/cdcu-wheelhouse
+mkdir -p /tmp/cdcu-wheelhouse
+
+aws s3 sync \
+  s3://cdcu-uat-data-lake/artifacts/python-wheelhouse/ \
+  /tmp/cdcu-wheelhouse/
+
+python -m pip install \
+  --no-index \
+  --find-links /tmp/cdcu-wheelhouse \
+  -r /tmp/cdcu-wheelhouse/requirements.txt
+```
+
+Validate imports and capture the output:
+
+```bash
+python - <<'PY'
+import pandas as pd
+import numpy as np
+from rapidfuzz import fuzz
+import jellyfish
+import awswrangler as wr
+
+print("Offline wheelhouse validation passed")
+print("pandas:", pd.__version__)
+print("numpy:", np.__version__)
+print("rapidfuzz:", fuzz.ratio("Garcia", "Garcia"))
+print("jellyfish:", jellyfish.jaro_winkler_similarity("Smith", "Smyth"))
+print("awswrangler:", wr.__version__)
+PY
+```
+
+Before production promotion, verify:
+
+- UAT offline installation and imports passed;
+- package scanning/approval and the `SHA256SUMS` manifest were retained;
+- the production SageMaker runtime is compatible with the Python 3.12 Linux
+  x86_64 wheel files;
+- the target SageMaker execution role can list/read the artifact prefix;
+- KMS decrypt access exists when the bucket uses SSE-KMS;
+- the production artifact prefix, object versions, and validation evidence are
+  approved.
+
+Repeat the upload to
+`s3://cdcu-prod-data-lake/artifacts/python-wheelhouse/` only after approval.
 
 ## Fresh Machine Setup
 

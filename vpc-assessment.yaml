@@ -40,6 +40,19 @@ Parameters:
     Default: sg-06ff146518f2cfb34
     Description: Existing BPI-MS MySQL/RDS security group ID allowed to receive CDCU runtime traffic. Current SIT value is bpims-osp-sg-rds.
 
+  EnableSageMakerPackageInstallEgress:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: SIT only. Set to true to allow outbound HTTPS through NAT Gateway for SageMaker package installation. Keep false for UAT and prod.
+
+Conditions:
+  EnableSitSageMakerPackageInstallEgress: !And
+    - !Equals [!Ref Environment, sit]
+    - !Equals [!Ref EnableSageMakerPackageInstallEgress, "true"]
+
 Resources:
   CDCUPrivateSubnet:
     Type: AWS::EC2::Subnet
@@ -115,6 +128,17 @@ Resources:
       IpProtocol: "-1"
       DestinationSecurityGroupId: !Ref CDCURuntimeSecurityGroup
       Description: Self-reference required for Glue and SageMaker runtime ENI communication (outbound).
+
+  CDCURuntimeSecurityGroupSageMakerPackageInstallEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: EnableSitSageMakerPackageInstallEgress
+    Properties:
+      GroupId: !Ref CDCURuntimeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+      Description: SIT only - allow outbound HTTPS through NAT Gateway for SageMaker pip/package installation.
 
   CDCUSecretsManagerEndpoint:
     Type: AWS::EC2::VPCEndpoint

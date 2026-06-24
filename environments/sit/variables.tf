@@ -151,7 +151,7 @@ variable "sagemaker_studio_user_profile_names" {
 variable "sagemaker_studio_space_instance_type" {
   description = "Instance type for the JupyterLab space in Unified Studio"
   type        = string
-  default     = "ml.t3.medium"
+  default     = "ml.m5.2xlarge"
 }
 
 variable "sagemaker_studio_space_volume_size_gb" {
@@ -181,7 +181,7 @@ variable "sagemaker_notebook_instance_name" {
 variable "sagemaker_notebook_instance_type" {
   description = "Instance type for the classic SageMaker Notebook Instance"
   type        = string
-  default     = "ml.t3.medium"
+  default     = "ml.m5.2xlarge"
 }
 
 variable "sagemaker_notebook_volume_size_gb" {

@@ -42,13 +42,13 @@ enable_sagemaker_unified_studio = true
 sagemaker_studio_user_profile_names = [
   "data-engineer-01",
 ]
-sagemaker_studio_space_instance_type     = "ml.m5.xlarge"
+sagemaker_studio_space_instance_type     = "ml.m5.2xlarge"
 sagemaker_studio_space_volume_size_gb    = 5
 sagemaker_studio_app_network_access_type = "VpcOnly"
 
 enable_sagemaker_notebook_instance        = true
 sagemaker_notebook_instance_name          = "cdcu-uat-notebook"
-sagemaker_notebook_instance_type          = "ml.m5.xlarge"
+sagemaker_notebook_instance_type          = "ml.m5.2xlarge"
 sagemaker_notebook_volume_size_gb         = 5
 sagemaker_notebook_direct_internet_access = "Disabled"
 sagemaker_notebook_root_access            = "Disabled"

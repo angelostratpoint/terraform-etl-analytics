@@ -88,6 +88,7 @@ Use the retained BPI-MS handoff guides for setup and deployment:
 
 | Guide | Purpose |
 |---|---|
+| `deployment-guide.md` | Executive deployment handoff index and document map for BPI-MS reviewers |
 | `docs/bootstrap-guide.md` | Creates or verifies the Terraform S3 state bucket and DynamoDB lock table |
 | `docs/deployment-guide.md` | Describes required BPI-MS inputs and the SIT/UAT/Prod Terraform run flow |
 | `docs/terraform-vpc-production-readiness.md` | Detailed Terraform architecture, `vpc-assessment.yaml`, ownership boundaries, and production-readiness checklist |
@@ -97,6 +98,42 @@ Use the retained BPI-MS handoff guides for setup and deployment:
 For production technical review, start with
 `docs/terraform-vpc-production-readiness.md`. IAM user/group documentation is
 summarized separately in `docs/iam-service-role-reference.md`.
+
+## Deployment Documentation Set
+
+The CDCU deployment documentation set for BPI-MS review consists of the
+following controlled documents:
+
+1. `README.md`
+2. `deployment-guide.md`
+3. `docs/bootstrap-guide.md`
+4. `docs/deployment-guide.md`
+5. `docs/iam-service-role-reference.md`
+6. `docs/runtime-connectivity-validation.md`
+7. `docs/terraform-vpc-production-readiness.md`
+
+Together, these documents describe:
+
+- the CDCU Terraform repository scope and ownership boundary;
+- one-time backend/bootstrap prerequisites;
+- environment deployment steps for SIT, UAT, and production;
+- IAM and service-role reference boundaries;
+- runtime validation and connectivity testing; and
+- production-readiness considerations for controlled rollout.
+
+## Architecture Review and Approval Record
+
+The current deployment architecture allows incremental refinement and
+operational stabilization without requiring major infrastructure redesign or
+environment rebuild activities.
+
+Reviewed by: Lester Gamier
+
+Approved by: Charwin Dale L. Chua
+
+Approved by: Emmanuel H Tolentino
+
+Approved by: Aubrey S. Macaspac
 
 ## Required External Inputs
 

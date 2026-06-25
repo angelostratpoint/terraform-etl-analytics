@@ -17,6 +17,11 @@ the detailed scope of this document. See
 [`iam-service-role-reference.md`](iam-service-role-reference.md) for the current
 human group, runtime role, PassRole, Lake Formation, and validation reference.
 
+This document forms part of the controlled CDCU deployment documentation set.
+For the executive handoff view and review/approval record, also refer to the
+repository [`README.md`](../README.md) and the root
+[`deployment-guide.md`](../deployment-guide.md).
+
 ## Deployment Architecture
 
 The application flow is:

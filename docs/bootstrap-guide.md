@@ -3,6 +3,11 @@
 This guide covers the one-time Terraform backend setup required before running
 `terraform init` for each CDCU environment.
 
+This document forms part of the controlled CDCU deployment documentation set.
+For the executive handoff view and review/approval record, also refer to the
+repository [`README.md`](../README.md) and the root
+[`deployment-guide.md`](../deployment-guide.md).
+
 ## Backend Resources
 
 Terraform uses an S3 backend and DynamoDB state locking.

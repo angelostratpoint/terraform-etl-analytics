@@ -17,6 +17,11 @@ can be used by BPI-MS to create the CDCU private subnet, runtime security group,
 and required interface endpoints in the approved OSP VPC. Terraform consumes the
 approved VPC, subnet, and security group outputs as inputs.
 
+This document forms part of the controlled CDCU deployment documentation set.
+For the executive handoff view and review/approval record, also refer to the
+repository [`README.md`](../README.md) and the root
+[`deployment-guide.md`](../deployment-guide.md).
+
 ## Repository Environments
 
 | Environment | Terraform root |

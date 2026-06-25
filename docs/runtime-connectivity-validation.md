@@ -3,6 +3,11 @@
 This document provides a lightweight validation approach for the current BPI-MS
 SIT CDCU infrastructure.
 
+This document forms part of the controlled CDCU deployment documentation set.
+For the executive handoff view and review/approval record, also refer to the
+repository [`README.md`](../README.md) and the root
+[`deployment-guide.md`](../deployment-guide.md).
+
 The target CDCU runtime flow is:
 
 ```text

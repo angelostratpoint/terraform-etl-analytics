@@ -6,6 +6,11 @@ This document is the current implementation reference for CDCU IAM access
 across SIT, UAT, and production. It complements the BPI-MS IAM design
 documentation without duplicating complete policy documents.
 
+This document forms part of the controlled CDCU deployment documentation set.
+For the executive handoff view and review/approval record, also refer to the
+repository [`README.md`](../README.md) and the root
+[`deployment-guide.md`](../deployment-guide.md).
+
 The authoritative configuration remains:
 
 - `cdcu-access.yaml` for human users, team groups, optional Lake Formation

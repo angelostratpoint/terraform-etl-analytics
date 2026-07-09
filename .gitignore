@@ -80,6 +80,7 @@ logs/
 outputs/
 scripts/
 privilege-results.txt
+*.txt
 
 # Excel and Office files
 *.xlsx

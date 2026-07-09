@@ -153,14 +153,20 @@ Resources:
               - logs:StartQuery
               - logs:GetQueryResults
               - logs:StopQuery
+              - logs:DescribeQueries
             Resource: "*"
 
           - Sid: CloudWatchMetrics
             Effect: Allow
             Action:
               - cloudwatch:GetMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:GetMetricWidgetImage
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
               - cloudwatch:ListMetrics
               - cloudwatch:DescribeAlarms
+              - cloudwatch:DescribeAlarmsForMetric
             Resource: "*"
 
           # AMAZON Q CONSOLE ASSISTANT
@@ -264,11 +270,6 @@ Resources:
               - cloudformation:*
             Resource: "*"
 
-          - Sid: DenyCloudShell
-            Effect: Deny
-            Action:
-              - cloudshell:*
-            Resource: "*"
 
           - Sid: DenyOrganizations
             Effect: Deny
@@ -308,10 +309,56 @@ Resources:
             Effect: Deny
             NotAction:
               - iam:*
+              - cloudwatch:GetMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:GetMetricWidgetImage
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:DescribeAlarmsForMetric
+              - cloudwatch:ListMetrics
+              - glue:BatchGet*
+              - glue:Describe*
+              - glue:Get*
+              - glue:List*
+              - glue:BatchGetCrawlers
+              - glue:BatchGetTriggers
+              - glue:BatchGetWorkflows
+              - glue:DescribeInboundIntegrations
+              - glue:DescribeIntegrations
+              - glue:GetConnection
+              - glue:GetConnections
+              - glue:GetCrawler
+              - glue:GetCrawlerMetrics
+              - glue:GetCrawlers
+              - glue:GetJob
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:GetJobs
+              - glue:GetTrigger
+              - glue:GetTriggers
+              - glue:GetWorkflow
+              - glue:GetWorkflowRun
+              - glue:GetWorkflowRuns
+              - glue:GetWorkflows
+              - glue:ListConnections
+              - glue:ListCrawlers
+              - glue:ListDatabases
+              - glue:ListJobs
+              - glue:ListWorkflows
+              - logs:DescribeQueries
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:GetQueryResults
+              - logs:StartQuery
+              - logs:StopQuery
               - route53:*
               - cloudfront:*
               - support:*
               - organizations:*
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:GetObjectVersion
               - q:*
               - qdeveloper:*
               - codewhisperer:*
@@ -945,6 +992,9 @@ Resources:
               - schemas:SearchSchemas
               - cloudwatch:GetMetricData
               - cloudwatch:GetMetricStatistics
+              - cloudwatch:GetMetricWidgetImage
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
               - cloudwatch:ListMetrics
             Resource: "*"
 
@@ -954,6 +1004,14 @@ Resources:
             Effect: Allow
             Action:
               - glue:BatchGetJobs
+              - glue:BatchGetCrawlers
+              - glue:BatchGetTriggers
+              - glue:BatchGetWorkflows
+              - glue:BatchGet*
+              - glue:Describe*
+              - glue:DescribeInboundIntegrations
+              - glue:DescribeIntegrations
+              - glue:Get*
               - glue:GetCrawler
               - glue:GetCrawlerMetrics
               - glue:GetCrawlers
@@ -966,6 +1024,11 @@ Resources:
               - glue:GetWorkflow
               - glue:GetWorkflowRun
               - glue:GetWorkflowRuns
+              - glue:GetWorkflows
+              - glue:List*
+              - glue:ListCrawlers
+              - glue:ListJobs
+              - glue:ListWorkflows
             Resource: "*"
 
           - Sid: CDCUJobs
@@ -1245,9 +1308,11 @@ Resources:
               Action:
                 - athena:ListWorkGroups
                 - glue:ListConnections
+                - glue:BatchGetCrawlers
                 - glue:ListCrawlers
                 - glue:ListDatabases
                 - glue:ListJobs
+                - glue:ListWorkflows
                 - kms:DescribeKey
                 - kms:ListAliases
                 - rds:DescribeDBClusters
@@ -1843,6 +1908,7 @@ Resources:
                   - glue:BatchGetWorkflows
                   - glue:GetWorkflowRun
                   - glue:GetWorkflowRuns
+                  - glue:ListWorkflows
                 Resource: "*"
 
         - PolicyName: DataEngineerEventBridgeCrawlerTriggerInlinePolicy

@@ -48,10 +48,22 @@ resource "aws_iam_policy" "deny_sensitive" {
           "secretsmanager:UpdateSecret",
           "secretsmanager:DeleteSecret",
           "secretsmanager:PutSecretValue",
-          "cloudformation:*",
+          "cloudformation:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "DenyCloudShellExceptTemporaryValidationUser"
+        Effect = "Deny"
+        Action = [
           "cloudshell:*"
         ]
         Resource = "*"
+        Condition = {
+          StringNotLike = {
+            "aws:PrincipalArn" = "arn:aws:iam::${local.account_id}:user/sp-angelojoe.delossantos"
+          }
+        }
       },
       {
         Sid    = "DenyOutsideRegion"
@@ -59,6 +71,52 @@ resource "aws_iam_policy" "deny_sensitive" {
         NotAction = [
           "iam:*",
           "sts:*",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:GetMetricWidgetImage",
+          "cloudwatch:GetDashboard",
+          "cloudwatch:ListDashboards",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:DescribeAlarmsForMetric",
+          "cloudwatch:ListMetrics",
+          "glue:BatchGet*",
+          "glue:Describe*",
+          "glue:Get*",
+          "glue:List*",
+          "glue:BatchGetCrawlers",
+          "glue:BatchGetTriggers",
+          "glue:BatchGetWorkflows",
+          "glue:DescribeInboundIntegrations",
+          "glue:DescribeIntegrations",
+          "glue:GetConnection",
+          "glue:GetConnections",
+          "glue:GetCrawler",
+          "glue:GetCrawlerMetrics",
+          "glue:GetCrawlers",
+          "glue:GetJob",
+          "glue:GetJobRun",
+          "glue:GetJobRuns",
+          "glue:GetJobs",
+          "glue:GetTrigger",
+          "glue:GetTriggers",
+          "glue:GetWorkflow",
+          "glue:GetWorkflowRun",
+          "glue:GetWorkflowRuns",
+          "glue:GetWorkflows",
+          "glue:ListConnections",
+          "glue:ListCrawlers",
+          "glue:ListDatabases",
+          "glue:ListJobs",
+          "glue:ListWorkflows",
+          "logs:DescribeQueries",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:GetQueryResults",
+          "logs:StartQuery",
+          "logs:StopQuery",
+          "s3:ListBucket",
+          "s3:GetObject",
+          "s3:GetObjectVersion",
           "s3:ListAllMyBuckets",
           "s3:GetBucketLocation"
         ]
@@ -274,7 +332,44 @@ resource "aws_iam_policy" "glue_etl" {
           "glue:GetCrawlerMetrics",
           "glue:ListSchemas", "glue:GetRegistry", "glue:ListRegistries",
           "schemas:ListRegistries", "schemas:ListSchemas", "schemas:DescribeRegistry", "schemas:DescribeSchema", "schemas:SearchSchemas",
-          "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"
+          "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics",
+          "cloudwatch:GetMetricWidgetImage", "cloudwatch:GetDashboard", "cloudwatch:ListDashboards",
+          "cloudwatch:DescribeAlarms", "cloudwatch:DescribeAlarmsForMetric"
+        ]
+        Resource = "*"
+      },
+      {
+        # Glue monitoring widgets and account-level summaries use wildcard reads
+        # even when the actual jobs/crawlers are resource-scoped.
+        Sid    = "GlueJobRunMonitoringConsoleRead"
+        Effect = "Allow"
+        Action = [
+          "glue:BatchGetJobs",
+          "glue:BatchGetCrawlers",
+          "glue:BatchGetTriggers",
+          "glue:BatchGetWorkflows",
+          "glue:BatchGet*",
+          "glue:Describe*",
+          "glue:DescribeInboundIntegrations",
+          "glue:DescribeIntegrations",
+          "glue:Get*",
+          "glue:GetCrawler",
+          "glue:GetCrawlerMetrics",
+          "glue:GetCrawlers",
+          "glue:GetJob",
+          "glue:GetJobRun",
+          "glue:GetJobRuns",
+          "glue:GetJobs",
+          "glue:GetTrigger",
+          "glue:GetTriggers",
+          "glue:GetWorkflow",
+          "glue:GetWorkflowRun",
+          "glue:GetWorkflowRuns",
+          "glue:GetWorkflows",
+          "glue:List*",
+          "glue:ListCrawlers",
+          "glue:ListJobs",
+          "glue:ListWorkflows"
         ]
         Resource = "*"
       },
@@ -332,7 +427,12 @@ resource "aws_iam_policy" "glue_cloudwatch" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:GetLogEvents"
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
+          "logs:DescribeQueries",
+          "logs:StartQuery",
+          "logs:GetQueryResults",
+          "logs:StopQuery"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
@@ -517,7 +617,12 @@ resource "aws_iam_policy" "sagemaker_cloudwatch" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:GetLogEvents"
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
+          "logs:DescribeQueries",
+          "logs:StartQuery",
+          "logs:GetQueryResults",
+          "logs:StopQuery"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/sagemaker/*",
@@ -963,7 +1068,11 @@ resource "aws_iam_policy" "ce_cloudwatch_combined" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:GetLogEvents"
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
+          "logs:StartQuery",
+          "logs:GetQueryResults",
+          "logs:StopQuery"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
@@ -1085,7 +1194,10 @@ resource "aws_iam_policy" "de_cloudwatch" {
         Effect = "Allow"
         Action = [
           "logs:GetLogEvents",
-          "logs:FilterLogEvents"
+          "logs:FilterLogEvents",
+          "logs:StartQuery",
+          "logs:GetQueryResults",
+          "logs:StopQuery"
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/glue/*",
@@ -1183,6 +1295,12 @@ resource "aws_iam_policy" "de_glue_console" {
         Sid    = "GlueStudioS3BucketDiscovery"
         Effect = "Allow"
         Action = [
+          "glue:ListConnections",
+          "glue:BatchGetCrawlers",
+          "glue:ListCrawlers",
+          "glue:ListDatabases",
+          "glue:ListJobs",
+          "glue:ListWorkflows",
           "s3:ListAllMyBuckets",
           "s3:GetBucketLocation"
         ]
@@ -1240,7 +1358,8 @@ resource "aws_iam_group_policy" "de_glue_orchestration" {
           "glue:GetWorkflows",
           "glue:BatchGetWorkflows",
           "glue:GetWorkflowRun",
-          "glue:GetWorkflowRuns"
+          "glue:GetWorkflowRuns",
+          "glue:ListWorkflows"
         ]
         Resource = "*"
       }

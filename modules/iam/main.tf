@@ -838,7 +838,7 @@ resource "aws_iam_role" "eventbridge_glue" {
 
 resource "aws_iam_policy" "eventbridge_glue" {
   name        = "ST-CDCU-${local.env}-EventBridgeGlueAccess"
-  description = "Allows EventBridge to start approved CDCU Glue crawlers/jobs and SageMaker processing jobs"
+  description = "Allows EventBridge to start approved CDCU Glue crawlers/jobs and SageMaker pipeline/processing targets"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -862,6 +862,14 @@ resource "aws_iam_policy" "eventbridge_glue" {
           "sagemaker:CreateProcessingJob"
         ]
         Resource = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-${local.env}-*"
+      },
+      {
+        Sid    = "EventBridgeSageMakerPipelineTargets"
+        Effect = "Allow"
+        Action = [
+          "sagemaker:StartPipelineExecution"
+        ]
+        Resource = "arn:aws:sagemaker:${local.region}:${local.account_id}:pipeline/cdcu-${local.env}-*"
       },
       {
         Sid    = "EventBridgePassSageMakerExecutionRole"
@@ -1143,6 +1151,43 @@ resource "aws_iam_group_policy_attachment" "ce_eventbridge" {
 resource "aws_iam_group_policy_attachment" "ce_deny" {
   group      = aws_iam_group.cloud_engineering.name
   policy_arn = aws_iam_policy.deny_sensitive.arn
+}
+
+resource "aws_iam_group_policy" "ce_lakeformation_admin" {
+  name  = "CloudEngineerLakeFormationGovernanceAdminInlinePolicy"
+  group = aws_iam_group.cloud_engineering.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "LakeFormationGovernanceAdmin"
+        Effect = "Allow"
+        Action = [
+          "lakeformation:DescribeResource",
+          "lakeformation:GetDataLakeSettings",
+          "lakeformation:GetEffectivePermissionsForPath",
+          "lakeformation:GetLFTag",
+          "lakeformation:GetResourceLFTags",
+          "lakeformation:GrantPermissions",
+          "lakeformation:ListLFTags",
+          "lakeformation:ListPermissions",
+          "lakeformation:ListResources",
+          "lakeformation:RevokePermissions",
+          "lakeformation:PutDataLakeSettings",
+          "lakeformation:RegisterResource",
+          "lakeformation:DeregisterResource",
+          "lakeformation:SearchDatabasesByLFTags",
+          "lakeformation:SearchTablesByLFTags",
+          "ram:GetResourceShareInvitations",
+          "ram:GetResourceShares",
+          "ram:ListPrincipals",
+          "ram:ListResources"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 ###############################################################################

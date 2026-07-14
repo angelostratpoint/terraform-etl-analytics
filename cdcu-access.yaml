@@ -466,6 +466,15 @@ Resources:
             Resource:
               - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/cdcu-${Environment}-*"
 
+          - Sid: SageMakerPipelineExecution
+            Effect: Allow
+            Action:
+              - sagemaker:DescribePipeline
+              - sagemaker:DescribePipelineExecution
+              - sagemaker:StartPipelineExecution
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:pipeline/cdcu-${Environment}-*"
+
   # QA VALIDATION POLICY
   # Merges the original QA and Business Review policies from cdcu-access.yaml.
   # It supports Athena validation and QuickSight report/dashboard review while
@@ -1795,6 +1804,30 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake"
                   - !Sub "arn:aws:s3:::cdcu-${Environment}-data-lake-${RegionSuffix}"
+
+              - Sid: LakeFormationGovernanceAdmin
+                Effect: Allow
+                Action:
+                  - lakeformation:DescribeResource
+                  - lakeformation:GetDataLakeSettings
+                  - lakeformation:GetEffectivePermissionsForPath
+                  - lakeformation:GetLFTag
+                  - lakeformation:GetResourceLFTags
+                  - lakeformation:GrantPermissions
+                  - lakeformation:ListLFTags
+                  - lakeformation:ListPermissions
+                  - lakeformation:ListResources
+                  - lakeformation:RevokePermissions
+                  - lakeformation:PutDataLakeSettings
+                  - lakeformation:RegisterResource
+                  - lakeformation:DeregisterResource
+                  - lakeformation:SearchDatabasesByLFTags
+                  - lakeformation:SearchTablesByLFTags
+                  - ram:GetResourceShareInvitations
+                  - ram:GetResourceShares
+                  - ram:ListPrincipals
+                  - ram:ListResources
+                Resource: "*"
 
               # REQUIRED FOR CODEPIPELINE / CODEBUILD
               - Sid: IAMPassRoleForPipeline

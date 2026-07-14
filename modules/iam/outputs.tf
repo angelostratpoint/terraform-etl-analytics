@@ -29,12 +29,12 @@ output "athena_query_role_name" {
 }
 
 output "eventbridge_glue_role_arn" {
-  description = "ARN of the ST-CDCU EventBridge Glue invocation role"
+  description = "ARN of the ST-CDCU EventBridge Glue/SageMaker invocation role"
   value       = aws_iam_role.eventbridge_glue.arn
 }
 
 output "eventbridge_glue_role_name" {
-  description = "Name of the ST-CDCU EventBridge Glue invocation role"
+  description = "Name of the ST-CDCU EventBridge Glue/SageMaker invocation role"
   value       = aws_iam_role.eventbridge_glue.name
 }
 

@@ -75,6 +75,9 @@ artifacts/**/.gitkeep
 # Agent working files
 .agents/
 
+# Internal tooling scripts (not part of client-facing Terraform repo)
+tools/
+
 # Sensitive/internal work outputs
 logs/
 outputs/

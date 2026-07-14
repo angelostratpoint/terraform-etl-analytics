@@ -6,11 +6,6 @@ This document is the current implementation reference for CDCU IAM access
 across SIT, UAT, and production. It complements the BPI-MS IAM design
 documentation without duplicating complete policy documents.
 
-This document forms part of the controlled CDCU deployment documentation set.
-For the executive handoff view and review/approval record, also refer to the
-repository [`README.md`](../README.md) and the root
-[`deployment-guide.md`](../deployment-guide.md).
-
 The authoritative configuration remains:
 
 - `cdcu-access.yaml` for human users, team groups, optional Lake Formation
@@ -174,63 +169,11 @@ These groups receive:
 - the shared security policy;
 - `{environment}-cdcu-qa-validation-policy`;
 - Athena validation in the CDCU workgroup;
-- read-only Glue Data Catalog discovery for `cdcu_{environment}_catalog`;
-- S3 console bucket discovery and read-only access to the CDCU data lake;
 - read/write access required for Athena query results;
 - QuickSight dashboard, analysis, dataset, and data-source review.
 
 They do not receive Glue or SageMaker administration, PassRole, Terraform
 backend access, or unrestricted S3 data-lake write access.
-
-The QA validation policy must include the console-discovery actions required
-to navigate Athena and S3. These actions do not grant unrestricted object or
-catalog access:
-
-```text
-glue:GetDatabase
-glue:GetDatabases
-glue:GetTable
-glue:GetTables
-glue:GetPartition
-glue:GetPartitions
-s3:ListAllMyBuckets
-s3:GetBucketLocation
-athena:ListWorkGroups
-athena:ListDataCatalogs
-athena:ListDatabases
-athena:ListTableMetadata
-```
-
-Data access remains scoped to the environment catalog and buckets:
-
-```text
-arn:aws:glue:REGION:ACCOUNT_ID:database/cdcu_ENVIRONMENT_catalog
-arn:aws:glue:REGION:ACCOUNT_ID:table/cdcu_ENVIRONMENT_catalog/*
-arn:aws:s3:::cdcu-ENVIRONMENT-data-lake
-arn:aws:s3:::cdcu-ENVIRONMENT-data-lake/*
-arn:aws:s3:::cdcu-ENVIRONMENT-athena-results
-arn:aws:s3:::cdcu-ENVIRONMENT-athena-results/*
-```
-
-QuickSight IAM permissions must still be paired with QuickSight user
-registration, the approved Reader role, and dashboard or dataset sharing.
-
-Athena must be able to verify the configured results bucket before a query
-runs. The QA policy therefore requires `s3:GetBucketLocation` and
-`s3:ListBucket` on the environment Athena results bucket, plus
-`s3:GetObject` and `s3:PutObject` on its query-results objects. Because the
-bucket is provisioned separately, QA does not require `s3:CreateBucket`,
-`s3:GetBucketPolicy`, or `s3:GetBucketVersioning`.
-
-For example:
-
-```text
-arn:aws:s3:::cdcu-ENVIRONMENT-athena-results
-arn:aws:s3:::cdcu-ENVIRONMENT-athena-results/*
-```
-
-The environment-specific `-apse1` bucket variant is also supported by
-`cdcu-access.yaml`.
 
 ## Customer-Managed Policies
 
@@ -429,10 +372,7 @@ action. Glue script access is provided through:
 - `glue:CreateScript` and `glue:GetDataflowGraph` for supported Glue Studio
   generation workflows.
 
-`glue:GetScript` has been removed from `cdcu-access.yaml` and the Terraform IAM
-mirror. Redeploy the target human-access stack and Terraform IAM module, then
-rerun IAM Access Analyzer to confirm that the active policy no longer contains
-the invalid action.
+Remove `glue:GetScript` from policy source before the next policy deployment.
 
 ## Validation Procedure
 
@@ -490,45 +430,6 @@ Review:
 - permission boundaries, SCPs, and session policies;
 - role trust relationships;
 - Lake Formation grants where applicable.
-
-### Validate human-access deployment separately
-
-Human group policies from `cdcu-access.yaml` are deployed through
-CloudFormation. Runtime roles and the secondary `ST-CDCU-*` groups from
-`modules/iam` are deployed through Terraform. A successful Terraform apply
-does not prove that the human-access CloudFormation stack was updated.
-
-After changing `cdcu-access.yaml`, verify the target environment explicitly:
-
-```bash
-aws cloudformation describe-stacks \
-  --stack-name sit-cdcu-access \
-  --region ap-southeast-1 \
-  --query 'Stacks[0].[StackStatus,LastUpdatedTime]'
-
-POLICY_ARN="arn:aws:iam::929350647322:policy/sit-cdcu-qa-validation-policy"
-VERSION=$(aws iam get-policy \
-  --policy-arn "$POLICY_ARN" \
-  --query 'Policy.DefaultVersionId' \
-  --output text)
-
-aws iam get-policy-version \
-  --policy-arn "$POLICY_ARN" \
-  --version-id "$VERSION" \
-  --query 'PolicyVersion.Document.Statement'
-```
-
-Repeat with the UAT or production account, stack, and policy names. Confirm
-the last-updated time and active policy document before asking users to
-retest. If CloudFormation reports `No changes to deploy`, verify that the
-latest repository revision was pulled and that the command targets the
-intended account and environment.
-
-The June 10, 2026 QA validation issue demonstrated this distinction: the
-Terraform apply completed, but the SIT QA user continued to receive the old
-`sit-cdcu-qa-validation-policy` until the correct human-access deployment was
-used. After the correct access update, QA could access the required console
-and validation functions.
 
 ## Operational Rules
 

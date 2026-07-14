@@ -1,297 +1,117 @@
 # CDCU Terraform Deployment Guide
 
-For the consolidated Terraform architecture, `vpc-assessment.yaml` resource
-breakdown, ownership boundary, and production-readiness checklist, also review
-[`terraform-vpc-production-readiness.md`](terraform-vpc-production-readiness.md).
-For the current human group, runtime role, PassRole, and Lake Formation access
-model, review [`iam-service-role-reference.md`](iam-service-role-reference.md).
+This workspace provisions the CDCU application service layer plus the additional `ST-CDCU` IAM roles and groups requested for the project. BPI MS / Stratpoint manually prepares the account baseline, deployment role, security baseline, VPC/subnets, security groups, KMS, source database access, and approved Secrets Manager secret containers before Terraform runs.
 
-This repository provisions the CDCU Terraform-managed service layer for BPI-MS.
-It is organized into separate environment roots for SIT, UAT, and production.
+## Prerequisites
 
-Terraform provisions CDCU-managed resources such as S3, Glue, Athena,
-SageMaker, QuickSight configuration, and the additional `ST-CDCU` IAM resources
-defined for the project. Terraform does not own the BPI-MS enterprise VPC or
-route table baseline. The provided `vpc-assessment.yaml` CloudFormation template
-can be used by BPI-MS to create the CDCU private subnet, runtime security group,
-and required interface endpoints in the approved OSP VPC. Terraform consumes the
-approved VPC, subnet, and security group outputs as inputs.
+Before deploying, confirm the following are in place:
 
-This document forms part of the controlled CDCU deployment documentation set.
-For the executive handoff view and review/approval record, also refer to the
-repository [`README.md`](../README.md) and the root
-[`deployment-guide.md`](../deployment-guide.md).
+- [ ] AWS CLI v2 installed
+- [ ] Terraform >= 1.6.0 installed
+- [ ] AWS SSO profile configured for the target environment
+- [ ] Remote state bucket and lock table bootstrapped, if not already created
+- [ ] `terraform_role_arn` is an IAM role ARN that the operator or CI identity can assume, not an IAM user ARN
+- [ ] BPI MS provided VPC ID, subnet ID, security group ID, and availability zone
+- [ ] Glue subnet has S3 access through an S3 Gateway VPC endpoint or NAT route
+- [ ] Existing KMS key ARN provided when `enable_kms = true`
+- [ ] Required Secrets Manager secrets already created
+- [ ] Real RDS JDBC URLs provided for Microsite and Legacy MySQL sources
+- [ ] QuickSight is enabled in `ap-southeast-1` when `enable_quicksight = true`
+- [ ] BPI MS has approved the additional `ST-CDCU` IAM roles, groups, and policies
+- [ ] GitHub environment named `prod` created with at least one required reviewer
 
-## Repository Environments
+## Manual Baseline Inputs
 
-| Environment | Terraform root |
+Fill these in `terraform.tfvars` for each environment:
+
+| Variable | Source |
 |---|---|
-| SIT | `environments/sit` |
-| UAT | `environments/uat` |
-| Prod | `environments/prod` |
+| `terraform_role_arn` | BPI MS deployment role ARN. Must be a role ARN, not a user ARN |
+| `vpc_id` | BPI MS network baseline |
+| `subnet_id` / `subnet_ids` | BPI MS network baseline |
+| `availability_zone` | Must match the Glue subnet |
+| `existing_security_group_id` | BPI MS network/security baseline |
+| `terraform_lock_table_name` | DynamoDB lock table used by Terraform state locking; should match the backend lock table for the target environment unless BPI MS intentionally uses another table |
+| `existing_quicksight_access_role_arn` | Optional BPI-managed QuickSight role reference, if required |
+| `existing_kms_key_arn` | Manual KMS baseline, required when KMS is enabled |
+| `git_repository_url` | GitHub repository URL for SageMaker code repository |
+| `quicksight_admin_principal_arn` | Existing QuickSight user/group owner, if not using Terraform-created group |
+| `microsite_jdbc_url` | JDBC URL for the BPI MS Microsite MySQL RDS source |
+| `legacy_jdbc_url` | JDBC URL for the BPI MS Legacy MySQL RDS source |
+| `github_org` / `github_repo` | GitHub repository identifiers used by IAM/OIDC-related inputs |
+| `sso_principal_arns` | BPI MS approved SSO principal ARNs for human-facing roles, if applicable |
+| `glue_worker_count` / `glue_worker_type` | BPI MS approved Glue capacity settings |
+| `enable_sagemaker_unified_studio` | Whether to create SageMaker Studio resources |
+| `sagemaker_studio_user_profile_names` | SageMaker Studio user profiles to provision |
+| `sagemaker_studio_space_instance_type` | JupyterLab Space instance type |
+| `sagemaker_studio_space_volume_size_gb` | JupyterLab Space EBS volume size |
+| `sagemaker_studio_app_network_access_type` | SageMaker Studio app network mode, typically `VpcOnly` |
+| `enable_quicksight` | Whether Terraform should create QuickSight resources |
+| `quicksight_spice_capacity_gb` | Approved SPICE capacity setting |
 
-Run Terraform from the target environment folder only. The repository root is
-not a Terraform root module.
+The backend configuration uses these remote state lock tables:
 
-## Naming Convention
-
-The Terraform implementation uses these CDCU naming patterns:
-
-| Resource area | Pattern | Example |
-|---|---|---|
-| AWS service resources | `cdcu-{env}-*` with approved suffixes when required | `cdcu-sit-data-lake-apse1` |
-| Secrets Manager paths | `cdcu/{env}/*` | `cdcu/sit/merged-mysql-connection` |
-| Glue catalog database | `cdcu_{env}_catalog` | `cdcu_sit_catalog` |
-| IAM roles, groups, policies | `ST-CDCU-{env}-*` | `ST-CDCU-sit-GlueExecutionRole` |
-| Terraform backend bucket | BPI-MS approved unique name | `cdcu-terraform-state-sit-apse1` |
-| Terraform lock table | `cdcu-terraform-locks-{env}` | `cdcu-terraform-locks-sit` |
-
-## Required BPI-MS Inputs
-
-Before deployment, BPI-MS must provide or approve the following values for the
-target environment:
-
-| Input | Purpose |
+| Environment | Backend lock table |
 |---|---|
-| `terraform_role_arn` | IAM role Terraform assumes during deployment |
-| `vpc_id` | Approved BPI-MS VPC for CDCU runtime placement |
-| `subnet_id` | `CDCUPrivateSubnetId` output from `vpc-assessment.yaml` |
-| `subnet_ids` | Approved private subnet list; for SIT use the `CDCUPrivateSubnetId` output |
-| `availability_zone` | Availability zone matching the primary subnet |
-| `existing_security_group_id` | `CDCURuntimeSecurityGroupId` output from `vpc-assessment.yaml` |
-| `terraform_lock_table_name` | DynamoDB table used by Terraform state locking |
-| `data_lake_bucket_name` | Approved data lake bucket name, such as `cdcu-sit-data-lake-apse1` |
-| `athena_results_bucket_name` | Approved Athena results bucket name, such as `cdcu-sit-athena-results-apse1` |
-| `existing_kms_key_arn` | BPI-MS KMS key ARN when KMS is enabled |
-| `merged_jdbc_url` | Merged MySQL RDS JDBC URL used by the CDCU Glue source connection |
-| `merged_mysql_secret_name` | Merged Secrets Manager secret name, such as `cdcu/sit/merged-mysql-connection` |
-| `git_repository_url` | Git repository URL for SageMaker code repository |
-| `quicksight_admin_principal_arn` | Approved QuickSight principal when QuickSight is enabled |
+| `pre-prod` | `cdcu-terraform-locks-pre-prod` |
+| `prod` | `cdcu-terraform-locks-prod` |
 
-The approved subnet and security group must support private Glue/SageMaker
-runtime connectivity to the source MySQL RDS environment, S3, and required AWS
-managed-service endpoints. Keep the network resource ownership with BPI-MS;
-Terraform only consumes the approved IDs.
+Set `terraform_lock_table_name` to the same environment-specific table unless BPI MS provides a different approved lock table name for the IAM policy.
 
-## Network Prerequisite
+Terraform checks the required external IDs before provisioning CDCU services. Glue and SageMaker execution roles are created by the `modules/iam` module using the `ST-CDCU` prefix.
 
-Before Terraform runs, BPI-MS should deploy or verify the network prerequisites.
-The provided `vpc-assessment.yaml` template is intended for BPI-MS-controlled
-network prerequisite provisioning inside the approved OSP VPC baseline. BPI-MS
-should supply the approved VPC, subnet CIDR, route table, availability zone, and
-RDS security group parameters at stack deployment time.
+## Required Secrets
 
-The template creates:
-
-| Resource | Purpose |
-|---|---|
-| `cdcu-sit-private-subnet-1a` | Private runtime subnet for CDCU managed services |
-| `cdcu-sit-runtime-sg` | Runtime security group for Glue and SageMaker |
-| Self-referencing SG ingress | Required for managed-service runtime ENI communication |
-| Interface endpoints | Secrets Manager, Glue, CloudWatch Logs, KMS, SageMaker API, SageMaker Runtime, and STS |
-
-The template intentionally does not create an S3 Gateway endpoint because the
-BPI-MS private route table already has the S3 prefix-list route. The runtime
-security group allows outbound HTTPS to the existing S3 prefix list
-`pl-6fa54006`.
-
-After the CloudFormation stack completes, copy these outputs into
-`terraform.tfvars`:
-
-```hcl
-vpc_id                     = "<CDCUVpcId output>"
-subnet_id                  = "<CDCUPrivateSubnetId output>"
-subnet_ids                 = ["<CDCUPrivateSubnetId output>"]
-availability_zone          = "<CDCUAvailabilityZone output>"
-existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
-```
-
-## Backend Prerequisite
-
-Before running `terraform init`, create the remote state backend for the target
-environment. See `docs/bootstrap-guide.md`.
-
-Expected backend resources:
-
-| Environment | State bucket | Lock table |
-|---|---|---|
-| SIT | `cdcu-terraform-state-sit-apse1` | `cdcu-terraform-locks-sit` |
-| UAT | `cdcu-terraform-state-uat` | `cdcu-terraform-locks-uat` |
-| Prod | `cdcu-terraform-state-prod` | `cdcu-terraform-locks-prod` |
-
-## AWS Credentials
-
-Terraform must be run by an approved BPI-MS IAM user, IAM role session, or AWS
-SSO role that has permission to:
-
-- access the Terraform S3 backend bucket,
-- access the Terraform DynamoDB lock table,
-- assume `terraform_role_arn`, and
-- provision the approved CDCU resources.
-
-Configure the AWS CLI before running Terraform.
-
-For access key based credentials:
-
-```powershell
-aws configure --profile bpi-ms-sit
-```
-
-Provide the BPI-MS approved values:
+Glue connections reference these existing Secrets Manager secret names:
 
 ```text
-AWS Access Key ID
-AWS Secret Access Key
-Default region name: ap-southeast-1
-Default output format: json
+cdcu/{environment}/microsite-mysql-connection
+cdcu/{environment}/legacy-mysql-connection
 ```
 
-For AWS SSO based access:
+Terraform does not create secret values and does not read `secret_string`, so database credentials are not stored in Terraform state. BPI MS / authorized operators should create and populate these secrets outside Terraform.
 
-```powershell
-aws configure sso --profile bpi-ms-sit
-aws sso login --profile bpi-ms-sit
-```
-
-Set the active profile for the terminal session:
-
-```powershell
-$env:AWS_PROFILE = "bpi-ms-sit"
-$env:AWS_REGION  = "ap-southeast-1"
-```
-
-Confirm the caller identity before running Terraform:
-
-```powershell
-aws sts get-caller-identity
-```
-
-The returned account must be the approved BPI-MS AWS account for the target
-environment. Do not proceed if the account is not correct.
-
-## Secrets
-
-Glue uses one merged BPI-MS MySQL source secret:
-
-```text
-cdcu/{environment}/merged-mysql-connection
-```
-
-The active Glue source connection is `cdcu-{environment}-merged-mysql`.
-Terraform no longer provisions separate Microsite and Legacy Glue source
-connections because BPI-MS consolidated the source into one RDS database.
-
-Terraform references the approved secret names. Secret values, passwords, and
-rotation material must not be committed to Git and must not be stored in
-Terraform variables or Terraform state. BPI-MS or an approved operator should
-populate and rotate the secret values through the approved secure process.
-
-The merged JDBC URL must point to the real RDS endpoint:
+Glue connections also require non-local JDBC URLs in `terraform.tfvars`:
 
 ```hcl
-merged_jdbc_url              = "jdbc:mysql://<rds-endpoint>:3306/<database>?useSSL=false&allowPublicKeyRetrieval=true"
-merged_mysql_secret_name     = "cdcu/<environment>/merged-mysql-connection"
-mysql_jdbc_driver_class_name = ""
-mysql_jdbc_driver_jar_uri    = ""
+microsite_jdbc_url = "jdbc:mysql://<bpi-microsite-rds-endpoint>:3306/<database>"
+legacy_jdbc_url    = "jdbc:mysql://<bpi-legacy-rds-endpoint>:3306/<database>"
 ```
 
-The variables reject `localhost` values to avoid deploying test placeholders.
-Leave `mysql_jdbc_driver_class_name` and `mysql_jdbc_driver_jar_uri` blank for
-the standard Glue-provided MySQL driver. Setting either custom driver property
-can prevent the Glue console **Test connection** workflow from running.
+The variables reject `localhost` values so test placeholders are not accidentally deployed to BPI MS environments.
 
-## Lake Formation
+## QuickSight
 
-If Lake Formation is enabled in the BPI-MS account, IAM permissions alone are
-not sufficient. BPI-MS must apply CDCU-scoped Lake Formation permissions for the
-runtime and query principals.
+QuickSight resources are controlled by `enable_quicksight`.
 
-Minimum grants to review:
+Set `enable_quicksight = true` only after BPI MS confirms:
 
-| Principal | Minimum grants |
-|---|---|
-| `ST-CDCU-{env}-GlueExecutionRole` | Database/table permissions for Glue crawler and job updates |
-| Approved Athena query principal | Database `DESCRIBE`, table `DESCRIBE`, and `SELECT` |
-| Approved QuickSight principal | Database `DESCRIBE`, table `DESCRIBE`, and `SELECT` |
+- QuickSight is enabled in `ap-southeast-1`
+- The namespace/user/group setup is ready
+- `quicksight_admin_principal_arn` is available and approved
+- SPICE capacity is approved
 
-BPI-MS remains owner of Lake Formation account settings, administrators, and
-enterprise data governance rules.
+If QuickSight is not ready, set `enable_quicksight = false` for the first infrastructure deployment and enable it in a later approved Terraform run.
 
-## Deployment Steps
+## EventBridge Automation
 
-From the repository root, choose the target environment. The examples below use
-SIT. Replace `sit` with `uat` or `prod` for the other environments.
+Current Terraform IAM includes human Cloud Engineering permissions to manage CDCU EventBridge rules scoped to `rule/cdcu-*`.
 
-```powershell
-cd environments/sit
-Copy-Item terraform.tfvars.example terraform.tfvars
-```
+S3 upload -> EventBridge -> Glue crawler automation is not enabled unless BPI MS separately approves the additional service-side components:
 
-Open `terraform.tfvars` and replace the placeholder values with BPI-MS approved
-values.
+- An EventBridge execution role trusted by `events.amazonaws.com`
+- A policy on that role allowing `glue:StartCrawler` on `crawler/cdcu-*`
+- S3 bucket EventBridge notifications for the approved upload prefixes
 
-Required values to review:
+Keep this automation as a separate approval item because it introduces a new service trust relationship.
 
-| Variable | What to set |
-|---|---|
-| `environment` | `sit`, `uat`, or `prod` |
-| `terraform_role_arn` | BPI-MS approved deployment role ARN |
-| `vpc_id` | Approved BPI-MS VPC ID |
-| `subnet_id` | `CDCUPrivateSubnetId` from `vpc-assessment.yaml` |
-| `subnet_ids` | `CDCUPrivateSubnetId` from `vpc-assessment.yaml`, unless BPI-MS approves more subnets |
-| `availability_zone` | Availability Zone of the primary subnet |
-| `data_lake_bucket_name` | Approved data lake bucket name |
-| `athena_results_bucket_name` | Approved Athena results bucket name |
-| `github_org` | Approved GitHub organization or repository owner |
-| `github_repo` | Approved repository name |
-| `sso_principal_arns` | BPI-MS approved SSO role/user principal ARNs, if applicable |
-| `enable_kms` | `true` only when BPI-MS provides an approved KMS key |
-| `existing_kms_key_arn` | Required when `enable_kms = true` |
-| `sns_topic_arn` | Approved SNS topic ARN, or empty string if unused |
-| `glue_worker_count` | Approved Glue worker count |
-| `glue_worker_type` | Approved Glue worker type |
-| `merged_jdbc_url` | Real merged MySQL RDS JDBC URL |
-| `merged_mysql_secret_name` | Real merged Secrets Manager secret name |
-| `git_repository_url` | Approved repository URL for SageMaker code repository |
-| `enable_sagemaker_unified_studio` | Whether to provision SageMaker Studio resources |
-| `sagemaker_studio_user_profile_names` | Approved SageMaker Studio user profile names |
-| `sagemaker_studio_space_instance_type` | Approved JupyterLab instance type |
-| `sagemaker_studio_space_volume_size_gb` | Approved JupyterLab EBS volume size |
-| `sagemaker_studio_app_network_access_type` | Usually `VpcOnly` |
-| `enable_sagemaker_notebook_instance` | Whether to provision the classic SageMaker Notebook Instance |
-| `sagemaker_notebook_instance_name` | Approved classic SageMaker Notebook Instance name |
-| `sagemaker_notebook_instance_type` | Approved classic notebook instance type, default `ml.m5.2xlarge` |
-| `sagemaker_notebook_volume_size_gb` | Approved classic notebook EBS volume size, default `5` |
-| `terraform_lock_table_name` | Environment lock table, such as `cdcu-terraform-locks-sit` |
-| `existing_quicksight_access_role_arn` | Approved QuickSight role ARN, or empty string |
-| `existing_security_group_id` | Approved CDCU runtime security group ID |
+## Deployment
 
-The most important BPI-MS infrastructure inputs are:
+```bash
+cd environments/pre-prod
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with BPI MS provided values
 
-```hcl
-terraform_role_arn = "arn:aws:iam::<account-id>:role/<approved-terraform-role>"
-
-vpc_id    = "<CDCUVpcId output or approved BPI-MS VPC ID>"
-subnet_id = "<CDCUPrivateSubnetId output>"
-subnet_ids = [
-  "<CDCUPrivateSubnetId output>",
-]
-availability_zone          = "<CDCUAvailabilityZone output>"
-existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
-
-data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
-athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
-
-enable_sagemaker_notebook_instance = true
-sagemaker_notebook_instance_type   = "ml.m5.2xlarge"
-sagemaker_notebook_volume_size_gb  = 5
-
-terraform_lock_table_name = "cdcu-terraform-locks-sit"
-```
-
-After `terraform.tfvars` is updated, run:
-
-```powershell
 terraform init
 terraform fmt -check -recursive ../../
 terraform validate
@@ -299,127 +119,34 @@ terraform plan -var-file="terraform.tfvars" -out=tfplan
 terraform apply tfplan
 ```
 
-For UAT and production, run the same flow from `environments/uat` and
-`environments/prod`.
+For production, run the same flow from `environments/prod`.
 
-## Deployment Flow Summary
-
-Use this sequence per environment:
-
-```powershell
-# 1. Authenticate to the target BPI-MS AWS account
-$env:AWS_PROFILE = "bpi-ms-sit"
-$env:AWS_REGION  = "ap-southeast-1"
-aws sts get-caller-identity
-
-# 2. Deploy or verify vpc-assessment.yaml in CloudFormation
-#    Then copy CDCUPrivateSubnetId and CDCURuntimeSecurityGroupId into terraform.tfvars.
-
-# 3. Deploy or verify cdcu-access.yaml in CloudFormation for human access.
-#    Confirm the command targets the same account and environment as Terraform.
-
-# 4. Go to the target Terraform root
-cd environments/sit
-
-# 5. Create and update terraform.tfvars
-Copy-Item terraform.tfvars.example terraform.tfvars
-notepad terraform.tfvars
-
-# 6. Initialize the backend
-terraform init
-
-# 7. Validate and review the plan
-terraform fmt -check -recursive ../../
-terraform validate
-terraform plan -var-file="terraform.tfvars" -out=tfplan
-
-# 8. Apply only after the plan is reviewed and approved
-terraform apply tfplan
-```
-
-`cdcu-access.yaml` and Terraform have different ownership boundaries:
-
-- `cdcu-access.yaml` manages environment human groups and policies such as
-  `sit-cdcu-qa-validation-policy`;
-- Terraform `modules/iam` manages runtime roles and secondary `ST-CDCU-*`
-  groups and policies.
-
-Running only `terraform apply` does not update the human QA, DE, or CE
-policies from `cdcu-access.yaml`.
+Run Terraform from the environment folder only. Running `terraform init`, `validate`, or `plan` from the repository root will not validate this project because the root folder is not a Terraform root module.
 
 ## Post-Deployment Checks
 
-Run these from the environment folder after `terraform apply` completes:
-
-```powershell
+```bash
 terraform output
 
-aws s3 ls s3://cdcu-sit-data-lake-apse1 --region ap-southeast-1
+aws s3 ls s3://cdcu-pre-prod-data-lake --profile cdcu-pre-prod-profile
 
-aws glue get-database `
-  --name cdcu_sit_catalog `
-  --region ap-southeast-1
+aws glue get-database \
+  --name cdcu_pre_prod_catalog \
+  --region ap-southeast-1 \
+  --profile cdcu-pre-prod-profile
 
-aws athena get-work-group `
-  --work-group cdcu-sit-workgroup `
-  --region ap-southeast-1
+aws athena get-work-group \
+  --work-group cdcu-pre-prod-workgroup \
+  --region ap-southeast-1 \
+  --profile cdcu-pre-prod-profile
+
+aws s3 ls s3://cdcu-pre-prod-data-lake/pre-prod/glue-scripts/ \
+  --profile cdcu-pre-prod-profile
 ```
 
-Replace `sit` with `uat` or `prod` when validating another environment.
+## DE Script Uploads
 
-For human-access changes, also verify the active policy document. For example:
-
-```powershell
-$PolicyArn = "arn:aws:iam::929350647322:policy/sit-cdcu-qa-validation-policy"
-$Version = aws iam get-policy `
-  --policy-arn $PolicyArn `
-  --query "Policy.DefaultVersionId" `
-  --output text
-
-aws iam get-policy-version `
-  --policy-arn $PolicyArn `
-  --version-id $Version `
-  --query "PolicyVersion.Document.Statement"
-```
-
-QA validation should confirm:
-
-- the Glue catalog database list is visible;
-- `cdcu_sit_catalog` or the target environment catalog is selectable;
-- CDCU data-lake buckets are visible and readable;
-- Athena queries can run in the CDCU workgroup;
-- Athena results are readable from the results bucket;
-- QuickSight Reader access and asset sharing are configured when QuickSight
-  validation is required.
-
-If Athena reports `Unable to verify/create output bucket`, confirm:
-
-- the workgroup output location uses the correct environment results bucket;
-- the bucket exists in `ap-southeast-1`;
-- the QA policy grants `s3:GetBucketLocation` and `s3:ListBucket` on the
-  bucket;
-- the QA policy grants `s3:GetObject` and `s3:PutObject` on the configured
-  query-results prefix;
-- the bucket policy does not deny HTTPS requests;
-- KMS permissions are present only when the workgroup or bucket uses SSE-KMS.
-
-Do not grant QA `s3:CreateBucket` when the approved results bucket already
-exists.
-
-## Runtime Validation
-
-Infrastructure deployment and runtime application validation are separate
-activities. Terraform can deploy the service layer before the final ETL and
-matching scripts are complete.
-
-The main runtime validations are:
-
-1. Real MySQL RDS extraction through Glue.
-2. Glue ETL script validation.
-3. SageMaker matching script validation.
-4. Athena and QuickSight validation.
-
-DE-owned scripts are uploaded from the repository when matching files exist:
+DE-owned scripts are stored in the codebase and uploaded to S3 during `terraform apply`.
 
 | Local path | S3 prefix |
 |---|---|
@@ -429,153 +156,68 @@ DE-owned scripts are uploaded from the repository when matching files exist:
 | `artifacts/sagemaker/processing/*.py` | `{env}/sagemaker-scripts/processing/` |
 | `artifacts/sql/athena/*.sql` | `{env}/sql/` |
 
-Empty script folders produce zero uploaded objects. That is expected until the
-approved runtime scripts are added.
+Empty directories containing only README files produce zero S3 objects. That is expected until DEs add scripts.
 
-## SageMaker Package Wheelhouse Deployment
+## GitHub Environment Protection Rule
 
-The validated SIT package bundle is stored at:
+The `terraform-apply.yml` workflow sets `environment: ${{ needs.detect-environment.outputs.environment }}` on the apply job. When the detected environment is `prod`, GitHub evaluates the protection rules configured for the `prod` environment before allowing the job to run.
 
-```text
-s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/
-```
+To set it up:
 
-It contains the pinned requirements and required wheel dependencies for the
-validated Python 3.12 Linux x86_64 SageMaker runtime. UAT and production should
-not enable internet egress for pip installation. Promote the approved bundle
-to the target account and install from a local SageMaker copy.
+1. Go to repository Settings -> Environments.
+2. Create an environment named exactly `prod`.
+3. Enable Required reviewers and add at least one reviewer or team.
+4. Save the environment.
 
-### 1. Validate the SIT bundle without internet package resolution
-
-```bash
-rm -rf /tmp/cdcu-wheelhouse-test
-mkdir -p /tmp/cdcu-wheelhouse-test
-
-aws s3 sync \
-  s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/ \
-  /tmp/cdcu-wheelhouse-test/
-
-python -m pip install \
-  --no-index \
-  --find-links /tmp/cdcu-wheelhouse-test \
-  -r /tmp/cdcu-wheelhouse-test/requirements.txt
-```
-
-The install passes only when pip resolves every requirement from the local
-wheelhouse and does not contact PyPI.
-
-### 2. Promote to UAT using separate account profiles
-
-```bash
-set -e
-
-STAGING_DIR="$HOME/cdcu-python-wheelhouse"
-rm -rf "$STAGING_DIR"
-mkdir -p "$STAGING_DIR"
-
-aws s3 sync \
-  s3://cdcu-sit-data-lake-apse1/artifacts/python-wheelhouse/ \
-  "$STAGING_DIR/" \
-  --profile bpims-dev \
-  --exact-timestamps
-
-find "$STAGING_DIR" -type f ! -name SHA256SUMS -print |
-  sort |
-  while IFS= read -r file; do shasum -a 256 "$file"; done \
-  > "$STAGING_DIR/SHA256SUMS"
-
-aws s3 sync \
-  "$STAGING_DIR/" \
-  s3://cdcu-uat-data-lake/artifacts/python-wheelhouse/ \
-  --profile bpims-core-uat \
-  --exact-timestamps
-```
-
-Direct bucket-to-bucket sync requires one principal with source read and
-destination write access. The local staging process is the default because SIT
-and UAT are separate AWS accounts.
-
-### 3. Install offline in UAT SageMaker
-
-```bash
-rm -rf /tmp/cdcu-wheelhouse
-mkdir -p /tmp/cdcu-wheelhouse
-
-aws s3 sync \
-  s3://cdcu-uat-data-lake/artifacts/python-wheelhouse/ \
-  /tmp/cdcu-wheelhouse/
-
-python -m pip install \
-  --no-index \
-  --find-links /tmp/cdcu-wheelhouse \
-  -r /tmp/cdcu-wheelhouse/requirements.txt
-```
-
-Validate imports and capture the output:
-
-```bash
-python - <<'PY'
-import pandas as pd
-import numpy as np
-from rapidfuzz import fuzz
-import jellyfish
-import awswrangler as wr
-
-print("Offline wheelhouse validation passed")
-print("pandas:", pd.__version__)
-print("numpy:", np.__version__)
-print("rapidfuzz:", fuzz.ratio("Garcia", "Garcia"))
-print("jellyfish:", jellyfish.jaro_winkler_similarity("Smith", "Smyth"))
-print("awswrangler:", wr.__version__)
-PY
-```
-
-Before production promotion, verify:
-
-- UAT offline installation and imports passed;
-- package scanning/approval and the `SHA256SUMS` manifest were retained;
-- the production SageMaker runtime is compatible with the Python 3.12 Linux
-  x86_64 wheel files;
-- the target SageMaker execution role can list/read the artifact prefix;
-- KMS decrypt access exists when the bucket uses SSE-KMS;
-- the production artifact prefix, object versions, and validation evidence are
-  approved.
-
-Repeat the upload to
-`s3://cdcu-prod-data-lake/artifacts/python-wheelhouse/` only after approval.
+Without this GitHub environment protection rule, a push to `main` with `[env:prod]` in the commit message can apply to production without an approval gate.
 
 ## Fresh Machine Setup
 
-The following local files and credentials are not committed:
+When cloning this repository on a new machine, the following are **not included** in the repo and must be set up manually before `terraform plan` will work:
 
-| Item | Action |
-|---|---|
-| `terraform.tfvars` | Copy from `terraform.tfvars.example` and fill approved values |
-| `.terraform/` | Run `terraform init` |
-| AWS credentials | Authenticate with the approved BPI-MS profile or role |
-| Terraform CLI | Install Terraform 1.6.0 or newer |
+| Missing Item | Why | Fix |
+|---|---|---|
+| `terraform.tfvars` | Gitignored — contains real credentials and IDs | Copy from `terraform.tfvars.example` and fill in values |
+| `.terraform/` directory | Gitignored — contains downloaded provider plugins | Run `terraform init` |
+| AWS credentials | Machine-specific | Run `aws sso login` or `aws configure` |
+| Terraform CLI | Must be installed | Install >= 1.6.0 from https://developer.hashicorp.com/terraform/install |
 
-Example:
+Step-by-step for a fresh clone:
 
 ```powershell
-git clone <approved-bpi-ms-repository-url>
+# 1. Clone and switch to the working branch
+git clone https://github.com/angelostratpoint/terraform-etl-analytics.git
 cd terraform-etl-analytics
-git checkout bpi-ms-terraform
+git checkout codex-client-governed-service-scope-v2
 
-cd environments/sit
-Copy-Item terraform.tfvars.example terraform.tfvars
+# 2. Authenticate to AWS
+aws sso login --profile your-profile
+# or
+aws configure
 
+# 3. Create terraform.tfvars from the example
+cd environments/pre-prod
+copy terraform.tfvars.example terraform.tfvars
+# Fill in all real values — VPC, subnet, SG, role ARN, JDBC URLs
+
+# 4. Initialize Terraform
 terraform init
+
+# 5. Validate and plan
 terraform validate
 terraform plan -var-file="terraform.tfvars" -out=tfplan
 ```
 
+> Note: Since resources are already provisioned in AWS, `terraform apply` on a fresh clone will not recreate anything. Terraform reads the remote state from S3 (`cdcu-terraform-state-pre-prod`) and confirms existing resources match the configuration. Any machine with the correct `terraform.tfvars` and AWS credentials can manage the same infrastructure.
+
+---
+
 ## Rollback
 
-Prefer reverting the Terraform change and applying a new plan. Avoid full
-environment destroy in production. For emergency SIT or UAT cleanup only, use a
-targeted destroy after review:
+Prefer reverting the Terraform change and applying a new plan. For emergency pre-prod cleanup only, targeted destroy can be used:
 
-```powershell
+```bash
 terraform destroy -target=module.glue -var-file="terraform.tfvars"
 ```
+
+Avoid full environment destroy in production.

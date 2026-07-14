@@ -8,20 +8,7 @@ This repository provisions the Terraform-owned service layer for the CDCU data p
 MySQL RDS sources -> AWS Glue -> S3 -> SageMaker -> Athena -> QuickSight
 ```
 
-BPI MS / Stratpoint prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC route table, KMS baseline, source database access, and approved network paths. The provided `vpc-assessment.yaml` CloudFormation template can create the CDCU private subnet, runtime security group, and required interface endpoints inside the approved BPI-MS OSP VPC. Terraform then consumes the CloudFormation outputs and provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
-
-## Current BPI-MS Alignment Status
-
-The May 2026 BPI-MS review confirmed the target operating model below:
-
-- Target environments are formally separated as `sit/`, `uat/`, and `prod/`.
-- BPI-MS will review/approve IAM policy resources by group: Cloud Engineering, Data Engineering, and QA.
-- BPI-MS owns VPC, route table, security group, endpoint, and RDS/MySQL governance. The optional `vpc-assessment.yaml` template is provided for BPI-MS-controlled network prerequisite provisioning.
-- Terraform should provision CDCU Secrets Manager secret containers using the approved names, but must not store or commit secret values.
-- Lake Formation is required when enabled by BPI-MS. The access template
-  contains CDCU-scoped grants when the approved runtime principals are
-  supplied; account-level Lake Formation governance remains with BPI-MS.
-- CodePipeline access for Cloud Engineering is later scope and is not required for the current Phase 1 package.
+BPI MS / Stratpoint manually prepares the AWS account baseline before Terraform runs. This includes the deployment role, security baseline, VPC/subnets, security groups, KMS baseline, source database access, and approved Secrets Manager secret containers. Terraform consumes those existing IDs and ARNs as inputs, then provisions the approved CDCU application services plus the additional `ST-CDCU` IAM roles and groups requested for this project.
 
 ## Terraform Scope
 
@@ -32,7 +19,7 @@ Terraform owns:
 | Additional IAM/RBAC | `ST-CDCU` service roles, human groups, additive policies, and shared deny policies |
 | 3.3.1 AWS S3 Bucket Creation | Data lake and Athena results buckets |
 | 3.3.2 AWS Glue Provisioning and Folder Structuring | Glue catalog database, connections, jobs, S3 script paths |
-| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, JupyterLab spaces, classic notebook instance, code repository |
+| 3.3.3 Amazon SageMaker Unified Studio Provisioning | Studio domain, user profiles, JupyterLab spaces, code repository |
 | 3.3.4 Amazon Athena Provisioning | Workgroup and query configuration |
 | 3.3.5 AWS Crawler Provisioning | Glue crawlers for raw, standardized, processed, and error prefixes |
 | 3.3.6 AWS QuickSight Provisioning | QuickSight groups, Athena data source, and dataset when enabled |
@@ -62,10 +49,8 @@ terraform-etl-analytics/
 |   `-- sql/
 |       `-- athena/             # Athena SQL files (*.sql)
 |-- bootstrap/                  # Optional remote state bootstrap helper
-|-- vpc-assessment.yaml         # BPI-MS CloudFormation network prerequisites
 |-- environments/
-|   |-- sit/                    # System Integration Testing root module
-|   |-- uat/                    # User Acceptance Testing root module
+|   |-- pre-prod/               # Pre-production root module
 |   `-- prod/                   # Production root module
 |-- modules/
 |   |-- artifacts/              # Uploads artifacts/* files to S3
@@ -76,64 +61,14 @@ terraform-etl-analytics/
 |   |-- s3/
 |   `-- sagemaker/
 `-- docs/
-    |-- bootstrap-guide.md      # Remote state backend setup
-    `-- deployment-guide.md     # Environment deployment steps
 ```
 
-Enterprise KMS, security groups, Secrets Manager secret values, Lake Formation account governance, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
+Enterprise KMS, security groups, Secrets Manager secret values, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
 
-## Deployment Guides
+## IAM Alignment
 
-Use the retained BPI-MS handoff guides for setup and deployment:
-
-| Guide | Purpose |
-|---|---|
-| `deployment-guide.md` | Executive deployment handoff index and document map for BPI-MS reviewers |
-| `docs/bootstrap-guide.md` | Creates or verifies the Terraform S3 state bucket and DynamoDB lock table |
-| `docs/deployment-guide.md` | Describes required BPI-MS inputs and the SIT/UAT/Prod Terraform run flow |
-| `docs/terraform-vpc-production-readiness.md` | Detailed Terraform architecture, `vpc-assessment.yaml`, ownership boundaries, and production-readiness checklist |
-| `docs/iam-service-role-reference.md` | Current human group, service role, PassRole, Lake Formation, and IAM validation reference |
-| `docs/runtime-connectivity-validation.md` | Runtime connectivity and service smoke tests |
-
-For production technical review, start with
-`docs/terraform-vpc-production-readiness.md`. IAM user/group documentation is
-summarized separately in `docs/iam-service-role-reference.md`.
-
-## Deployment Documentation Set
-
-The CDCU deployment documentation set for BPI-MS review consists of the
-following controlled documents:
-
-1. `README.md`
-2. `deployment-guide.md`
-3. `docs/bootstrap-guide.md`
-4. `docs/deployment-guide.md`
-5. `docs/iam-service-role-reference.md`
-6. `docs/runtime-connectivity-validation.md`
-7. `docs/terraform-vpc-production-readiness.md`
-
-Together, these documents describe:
-
-- the CDCU Terraform repository scope and ownership boundary;
-- one-time backend/bootstrap prerequisites;
-- environment deployment steps for SIT, UAT, and production;
-- IAM and service-role reference boundaries;
-- runtime validation and connectivity testing; and
-- production-readiness considerations for controlled rollout.
-
-## Architecture Review and Approval Record
-
-The current deployment architecture allows incremental refinement and
-operational stabilization without requiring major infrastructure redesign or
-environment rebuild activities.
-
-Reviewed by: Lester Gamier
-
-Approved by: Charwin Dale L. Chua
-
-Approved by: Emmanuel H Tolentino
-
-Approved by: Aubrey S. Macaspac
+The BPI-MS IAM policy alignment reference is maintained in `docs/bpims-iam-policy-alignment.md`.
+It identifies implemented `ST-CDCU` roles/groups, group attachments, service policies, and approval-only items such as scoped PassRole, EventBridge service execution, and KMS runtime permissions.
 
 ## Required External Inputs
 
@@ -150,42 +85,16 @@ existing_kms_key_arn # required when enable_kms = true
 existing_quicksight_access_role_arn # optional, for BPI-managed QuickSight role references
 ```
 
-For SIT, the network values should come from the BPI-MS-approved
-`vpc-assessment.yaml` CloudFormation stack outputs:
-
-```hcl
-vpc_id                     = "<CDCUVpcId output or approved BPI-MS VPC ID>"
-subnet_id                  = "<CDCUPrivateSubnetId output>"
-subnet_ids                 = ["<CDCUPrivateSubnetId output>"]
-availability_zone          = "<CDCUAvailabilityZone output>"
-existing_security_group_id = "<CDCURuntimeSecurityGroupId output>"
-```
-
-BPI-MS SIT bucket names currently use the regional suffix:
-
-```hcl
-data_lake_bucket_name      = "cdcu-sit-data-lake-apse1"
-athena_results_bucket_name = "cdcu-sit-athena-results-apse1"
-```
-
 `existing_glue_execution_role_arn` and `existing_sagemaker_execution_role_arn` are deprecated compatibility inputs. Active environment roots use the `ST-CDCU` roles created by `modules/iam`.
 
-Glue uses one merged BPI-MS MySQL source secret:
+Glue connections expect these Secrets Manager secret names to already exist:
 
 ```text
-cdcu/{environment}/merged-mysql-connection
+cdcu/{environment}/microsite-mysql-connection
+cdcu/{environment}/legacy-mysql-connection
 ```
 
-The active Glue source connection is `cdcu-{environment}-merged-mysql`.
-Terraform no longer provisions separate Microsite and Legacy Glue source
-connections because BPI-MS consolidated the source into one RDS database.
-By default the Glue connection uses the Glue-provided MySQL driver so the
-Glue console connection test remains supported. Set `mysql_jdbc_driver_class_name`
-or `mysql_jdbc_driver_jar_uri` only when BPI-MS provides an approved custom
-driver configuration.
-
-Terraform references the secret names only. Secret values, password rotation
-material, and database credentials must remain outside Terraform state.
+Terraform references the secret names only. It does not read or store database credentials in state.
 
 ## DE Artifact Uploads
 
@@ -204,10 +113,7 @@ Directories containing only README files produce zero S3 objects. That is expect
 ## Local Execution
 
 ```bash
-# Optional BPI-MS network prerequisite, run through CloudFormation first:
-# vpc-assessment.yaml
-
-cd environments/sit
+cd environments/pre-prod
 cp terraform.tfvars.example terraform.tfvars
 # Fill terraform.tfvars with BPI MS provided values
 terraform init
@@ -217,18 +123,4 @@ terraform plan -var-file="terraform.tfvars" -out=tfplan
 terraform apply tfplan
 ```
 
-UAT and production use the same flow from `environments/uat` and `environments/prod`. Production requires the prod GitHub environment approval gate for CI/CD applies if CI/CD is enabled later.
-
-## Production Review Notes
-
-The lower-environment values embedded as defaults or examples must not be
-reused automatically for production. BPI-MS must provide or approve the
-production VPC, subnet CIDRs, route table, RDS security group, S3 prefix list,
-KMS key, backend, bucket names, and deployment role.
-
-Terraform uses one Glue catalog database per environment:
-`cdcu_{environment}_catalog`. The SIT `cdcu_standardized_db` database is a
-legacy Employee test resource and is not created by the Glue Terraform module.
-Current standardized output is cataloged in `cdcu_sit_catalog` from the
-`standardized/merged/` S3 prefix. The legacy database must not be promoted to
-UAT or production.
+Production uses the same flow from `environments/prod` and requires the prod GitHub environment approval gate for CI/CD applies.

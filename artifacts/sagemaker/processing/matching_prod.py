@@ -1064,6 +1064,14 @@ OUT = {
         _clusters_df,
         f"{OUTPUT_BASE}/{RUN_DATE}/clusters_sagemaker/",
     ),
+    "merge_review": (
+        merge_review,
+        f"{OUTPUT_BASE}/{RUN_DATE}/merge_review_sagemaker/",
+    ),
+    "eyeball_review": (
+        eyeball_review,
+        f"{OUTPUT_BASE}/{RUN_DATE}/eyeball_review_sagemaker/",
+    ),
 }
 
 write_errors = []

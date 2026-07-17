@@ -177,7 +177,7 @@ resource "aws_iam_policy" "glue_s3" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "${var.data_lake_bucket_arn}/raw/customers/_metadata/*",
+          "${var.data_lake_bucket_arn}/raw/customers/*",
           "${var.data_lake_bucket_arn}/standardized/merged/*",
           "${var.data_lake_bucket_arn}/processed/matching/*",
           "${var.data_lake_bucket_arn}/processed/matching_csv/*"

@@ -73,6 +73,7 @@ sagemaker_notebook_root_access            = "Disabled"
 enable_sagemaker_matching_pipeline          = false
 enable_sagemaker_matching_pipeline_schedule = false
 enable_sagemaker_matching_pipeline_glue_success_event = false
+enable_sagemaker_matching_pipeline_processed_crawler_event = false
 sagemaker_matching_pipeline_schedule_expression = "rate(1 day)"
 sagemaker_matching_pipeline_processing_image_uri = ""
 enable_sagemaker_processing_image_repository = false

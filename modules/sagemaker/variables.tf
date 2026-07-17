@@ -170,8 +170,20 @@ variable "matching_pipeline_glue_success_event_enabled" {
   default     = false
 }
 
+variable "matching_pipeline_processed_crawler_event_enabled" {
+  description = "Whether to create an EventBridge rule that starts the processed matching Glue crawler when the SageMaker matching pipeline succeeds"
+  type        = bool
+  default     = false
+}
+
 variable "matching_pipeline_trigger_glue_job_name" {
   description = "Glue job name whose SUCCEEDED event starts the matching pipeline when glue-success triggering is enabled"
+  type        = string
+  default     = ""
+}
+
+variable "matching_pipeline_success_glue_workflow_arn" {
+  description = "Glue workflow ARN notified by EventBridge after the SageMaker matching pipeline succeeds; the workflow event trigger starts the processed matching crawler"
   type        = string
   default     = ""
 }

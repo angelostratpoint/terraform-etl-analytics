@@ -122,6 +122,11 @@ output "sagemaker_matching_pipeline_glue_success_rule_name" {
   value       = module.sagemaker.matching_pipeline_glue_success_rule_name
 }
 
+output "sagemaker_matching_pipeline_processed_crawler_success_rule_name" {
+  description = "EventBridge rule name that starts the processed matching crawler after the SageMaker matching pipeline succeeds"
+  value       = module.sagemaker.matching_pipeline_processed_crawler_success_rule_name
+}
+
 output "sagemaker_processing_image" {
   description = "Terraform-managed SageMaker Processing ECR image information"
   value = {

@@ -878,12 +878,14 @@ resource "aws_iam_policy" "eventbridge_glue" {
         Sid    = "EventBridgeGlueTargets"
         Effect = "Allow"
         Action = [
+          "glue:notifyEvent",
           "glue:StartCrawler",
           "glue:StartJobRun"
         ]
         Resource = [
           "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-${local.env}-*",
-          "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-${local.env}-*"
+          "arn:aws:glue:${local.region}:${local.account_id}:job/cdcu-${local.env}-*",
+          "arn:aws:glue:${local.region}:${local.account_id}:workflow/cdcu-${local.env}-*"
         ]
       },
       {

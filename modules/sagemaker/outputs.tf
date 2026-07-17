@@ -72,3 +72,8 @@ output "matching_pipeline_glue_success_rule_name" {
   description = "EventBridge Glue-success rule name for the CDCU matching pipeline"
   value       = var.enable_matching_pipeline && var.matching_pipeline_glue_success_event_enabled ? aws_cloudwatch_event_rule.matching_pipeline_after_glue_success[0].name : null
 }
+
+output "matching_pipeline_processed_crawler_success_rule_name" {
+  description = "EventBridge rule name that starts the processed matching crawler after the SageMaker matching pipeline succeeds"
+  value       = var.enable_matching_pipeline && var.matching_pipeline_processed_crawler_event_enabled ? aws_cloudwatch_event_rule.processed_matching_crawler_after_pipeline_success[0].name : null
+}

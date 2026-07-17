@@ -256,6 +256,12 @@ variable "enable_sagemaker_matching_pipeline_glue_success_event" {
   default     = false
 }
 
+variable "enable_sagemaker_matching_pipeline_processed_crawler_event" {
+  description = "Whether to create an EventBridge rule that starts the processed matching crawler when the SageMaker matching pipeline succeeds"
+  type        = bool
+  default     = false
+}
+
 variable "sagemaker_matching_pipeline_schedule_expression" {
   description = "EventBridge schedule expression for the CDCU SageMaker matching pipeline"
   type        = string

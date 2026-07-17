@@ -102,6 +102,12 @@ variable "enable_workflow_schedule" {
   default     = false
 }
 
+variable "enable_processed_matching_crawler_event_trigger" {
+  description = "Whether to provision an event trigger that starts the processed matching crawler when EventBridge notifies the Glue workflow"
+  type        = bool
+  default     = false
+}
+
 variable "workflow_schedule_expression" {
   description = "Glue cron/rate expression for the scheduled workflow trigger. AWS evaluates cron schedules in UTC."
   type        = string

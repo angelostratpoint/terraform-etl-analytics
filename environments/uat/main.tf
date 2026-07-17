@@ -79,11 +79,10 @@ module "glue" {
   mysql_jdbc_driver_jar_uri                        = var.mysql_jdbc_driver_jar_uri
   enable_workflow_orchestration                    = var.enable_glue_workflow_orchestration
   enable_workflow_schedule                         = var.enable_glue_workflow_schedule
-  enable_processed_matching_crawler_event_trigger  = var.enable_sagemaker_matching_pipeline_processed_crawler_event
   workflow_schedule_expression                     = var.glue_workflow_schedule_expression
   tags                                             = local.common_tags
 
-  depends_on = [terraform_data.manual_baseline_contract, module.iam]
+  depends_on = [terraform_data.manual_baseline_contract, module.iam, module.artifacts]
 }
 
 module "athena" {
@@ -138,9 +137,8 @@ module "sagemaker" {
   enable_matching_pipeline                          = var.enable_sagemaker_matching_pipeline
   matching_pipeline_schedule_enabled                = var.enable_sagemaker_matching_pipeline_schedule
   matching_pipeline_glue_success_event_enabled      = var.enable_sagemaker_matching_pipeline_glue_success_event
-  matching_pipeline_processed_crawler_event_enabled = var.enable_sagemaker_matching_pipeline_processed_crawler_event
   matching_pipeline_trigger_glue_job_name           = module.glue.merged_standardization_job_name
-  matching_pipeline_success_glue_workflow_arn       = module.glue.workflow_arn
+  matching_pipeline_processed_crawler_name          = module.glue.processed_matching_crawler_name
   matching_pipeline_schedule_expression             = var.sagemaker_matching_pipeline_schedule_expression
   matching_pipeline_processing_image_uri            = local.sagemaker_matching_pipeline_processing_image_uri
   matching_pipeline_processing_script_name          = var.sagemaker_matching_pipeline_processing_script_name
@@ -154,7 +152,7 @@ module "sagemaker" {
   matching_pipeline_output_s3_uri                   = var.sagemaker_matching_pipeline_output_s3_uri
   tags                           = local.common_tags
 
-  depends_on = [terraform_data.manual_baseline_contract, module.iam, module.sagemaker_processing_image]
+  depends_on = [terraform_data.manual_baseline_contract, module.iam, module.artifacts, module.sagemaker_processing_image]
 }
 
 module "quicksight" {

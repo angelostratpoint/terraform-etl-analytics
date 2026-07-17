@@ -41,7 +41,7 @@ mysql_jdbc_driver_jar_uri    = ""
 
 enable_glue_workflow_orchestration = false
 enable_glue_workflow_schedule      = false
-glue_workflow_schedule_expression  = "cron(0 18 * * ? *)" # 2:00 AM Asia/Manila daily
+glue_workflow_schedule_expression  = "cron(0 18 1 1 ? *)" # 2:00 AM Asia/Manila yearly on January 1
 
 git_repository_url = "https://git-codecommit.ap-southeast-1.amazonaws.com/v1/repos/cdcu"
 
@@ -73,7 +73,6 @@ sagemaker_notebook_root_access            = "Disabled"
 enable_sagemaker_matching_pipeline          = false
 enable_sagemaker_matching_pipeline_schedule = false
 enable_sagemaker_matching_pipeline_glue_success_event = false
-enable_sagemaker_matching_pipeline_processed_crawler_event = false
 sagemaker_matching_pipeline_schedule_expression = "rate(1 day)"
 sagemaker_matching_pipeline_processing_image_uri = ""
 enable_sagemaker_processing_image_repository = false

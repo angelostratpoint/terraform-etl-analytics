@@ -11,6 +11,7 @@ locals {
   matching_output_s3_uri               = var.matching_pipeline_output_s3_uri != "" ? var.matching_pipeline_output_s3_uri : "s3://${var.data_lake_bucket_name}/processed/matching/"
   matching_wheelhouse_s3_uri           = var.matching_pipeline_wheelhouse_s3_uri != "" ? var.matching_pipeline_wheelhouse_s3_uri : "s3://${var.data_lake_bucket_name}/artifacts/python-wheelhouse/"
   matching_processing_script_s3_prefix = "s3://${var.data_lake_bucket_name}/${var.environment}/sagemaker-scripts/processing/"
+  matching_processed_crawler_name      = var.matching_pipeline_processed_crawler_name != "" ? var.matching_pipeline_processed_crawler_name : "cdcu-${var.environment}-processed-matching-crawler"
 
   matching_pipeline_definition = {
     Version = "2020-12-01"
@@ -35,6 +36,7 @@ locals {
             CDCU_STANDARDIZED_S3_URI    = local.matching_standardized_s3_uri
             CDCU_MATCHING_OUTPUT_S3_URI = local.matching_output_s3_uri
             CDCU_MATCHING_SCRIPT_NAME   = var.matching_pipeline_processing_script_name
+            CDCU_PROCESSED_MATCHING_CRAWLER_NAME = local.matching_processed_crawler_name
           }
           ProcessingResources = {
             ClusterConfig = {
@@ -329,49 +331,6 @@ resource "aws_cloudwatch_event_target" "matching_pipeline_after_glue_success" {
     precondition {
       condition     = var.eventbridge_role_arn != ""
       error_message = "eventbridge_role_arn is required when matching_pipeline_glue_success_event_enabled = true."
-    }
-  }
-}
-
-resource "aws_cloudwatch_event_rule" "processed_matching_crawler_after_pipeline_success" {
-  count = var.enable_matching_pipeline && var.matching_pipeline_processed_crawler_event_enabled ? 1 : 0
-
-  name        = "cdcu-${var.environment}-processed-crawler-after-matching"
-  description = "Notifies the CDCU ${var.environment} Glue workflow to start the processed matching crawler after the SageMaker matching pipeline succeeds"
-
-  event_pattern = jsonencode({
-    source      = ["aws.sagemaker"]
-    detail-type = ["SageMaker Model Building Pipeline Execution Status Change"]
-    detail = {
-      pipelineArn                    = [aws_sagemaker_pipeline.matching[0].arn]
-      currentPipelineExecutionStatus = ["Succeeded"]
-    }
-  })
-
-  tags = merge(var.tags, {
-    Name = "cdcu-${var.environment}-processed-crawler-after-matching"
-  })
-
-  lifecycle {
-    precondition {
-      condition     = var.matching_pipeline_success_glue_workflow_arn != ""
-      error_message = "matching_pipeline_success_glue_workflow_arn is required when matching_pipeline_processed_crawler_event_enabled = true."
-    }
-  }
-}
-
-resource "aws_cloudwatch_event_target" "processed_matching_crawler_after_pipeline_success" {
-  count = var.enable_matching_pipeline && var.matching_pipeline_processed_crawler_event_enabled ? 1 : 0
-
-  rule      = aws_cloudwatch_event_rule.processed_matching_crawler_after_pipeline_success[0].name
-  target_id = "cdcu-${var.environment}-processed-matching-workflow"
-  arn       = var.matching_pipeline_success_glue_workflow_arn
-  role_arn  = var.eventbridge_role_arn
-
-  lifecycle {
-    precondition {
-      condition     = var.eventbridge_role_arn != ""
-      error_message = "eventbridge_role_arn is required when matching_pipeline_processed_crawler_event_enabled = true."
     }
   }
 }

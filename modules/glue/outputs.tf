@@ -58,6 +58,5 @@ output "workflow_trigger_names" {
     aws_glue_trigger.scheduled_raw_extraction[*].name,
     aws_glue_trigger.after_raw_extraction[*].name,
     aws_glue_trigger.after_standardization[*].name,
-    aws_glue_trigger.processed_matching_after_pipeline_success_event[*].name,
   ) : []
 }

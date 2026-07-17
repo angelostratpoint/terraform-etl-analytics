@@ -12,7 +12,7 @@ if sys.version_info < (3, 8):
 
 _import_errors = []
 try:
-    import re, gc, json, time, uuid
+    import re, gc, json, time
     import numpy as np
     import pandas as pd
 except ImportError as e:
@@ -167,6 +167,7 @@ print(f"MEM_ABORT_GB   = {MEM_ABORT_GB}")
 print(f"RUN_DATE = {RUN_DATE}")
 
 import os
+import boto3
 import awswrangler as wr
 wr.engine.set("python")
 wr.memory_format.set("pandas")
@@ -1035,36 +1036,33 @@ CSV_OUTPUT_BASE = os.getenv(
     "CDCU_MATCHING_CSV_OUTPUT_S3_URI",
     f"s3://{DATA_LAKE_BUCKET}/processed/matching_csv"
 ).rstrip("/")
-RUN_TIMESTAMP = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-RUN_ID = os.getenv("CDCU_MATCHING_RUN_ID", f"{RUN_TIMESTAMP}-{uuid.uuid4().hex[:8]}")
-
 _survivor_df = survivor_df if "survivor_df" in globals() else pd.DataFrame()
 _clusters_df = clusters_df if "clusters_df" in globals() else pd.DataFrame()
 
 OUT = {
     "merge": (
         merge_df,
-        f"{OUTPUT_BASE}/merge_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/merge_sagemaker/",
     ),
     "eyeball": (
         eyeball_df,
-        f"{OUTPUT_BASE}/eyeball_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/eyeball_sagemaker/",
     ),
     "unique": (
         unique_df,
-        f"{OUTPUT_BASE}/unique_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/unique_sagemaker/",
     ),
     "merge_survivors": (
         _survivor_df,
-        f"{OUTPUT_BASE}/merge_survivors_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/merge_survivors_sagemaker/",
     ),
     "deduped_input": (
         deduped_input_df,
-        f"{OUTPUT_BASE}/deduped_input_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/deduped_input_sagemaker/",
     ),
     "clusters": (
         _clusters_df,
-        f"{OUTPUT_BASE}/clusters_sagemaker/run_date={RUN_DATE}/run_id={RUN_ID}/",
+        f"{OUTPUT_BASE}/{RUN_DATE}/clusters_sagemaker/",
     ),
 }
 
@@ -1091,7 +1089,7 @@ for name, (frame, path) in OUT.items():
             df=frame,
             path=path,
             dataset=True,
-            mode="append",
+            mode="overwrite",
             compression="snappy",
         )
         print(f"{name:16s} -> {path} ({len(frame):,} rows written)")
@@ -1104,7 +1102,7 @@ for name, frame in csv_out.items():
         print(f"{name:16s} CSV -> SKIPPED (0 rows)")
         continue
 
-    csv_path = f"{CSV_OUTPUT_BASE}/{name}/run_date={RUN_DATE}/run_id={RUN_ID}/{name}.csv"
+    csv_path = f"{CSV_OUTPUT_BASE}/{RUN_DATE}/{name}/{name}.csv"
     try:
         wr.s3.to_csv(
             df=frame,
@@ -1132,7 +1130,26 @@ if csv_write_errors:
 else:
     print("CSV review outputs written successfully.")
 
+CRAWLER_NAME = os.getenv("CDCU_PROCESSED_MATCHING_CRAWLER_NAME", "").strip()
+if CRAWLER_NAME and not write_errors:
+    try:
+        aws_region = (
+            os.getenv("AWS_REGION")
+            or os.getenv("AWS_DEFAULT_REGION")
+            or os.getenv("CDCU_AWS_REGION")
+            or "ap-southeast-1"
+        )
+        glue_client = boto3.client("glue", region_name=aws_region)
+        glue_client.start_crawler(Name=CRAWLER_NAME)
+        print(f"Started Glue crawler: {CRAWLER_NAME} in {aws_region}")
+    except Exception as e:
+        if e.__class__.__name__ == "CrawlerRunningException":
+            print(f"Glue crawler already running: {CRAWLER_NAME}")
+        else:
+            print(f"WARNING: Failed to start Glue crawler {CRAWLER_NAME}: {e}")
+elif CRAWLER_NAME:
+    print(f"Skipped Glue crawler start because Parquet writes had errors: {CRAWLER_NAME}")
+
 print(f"\nrun_date = {RUN_DATE}")
-print(f"run_id   = {RUN_ID}")
 print(f"Final memory: {format_mem_gb()}")
 print("\nDone.")

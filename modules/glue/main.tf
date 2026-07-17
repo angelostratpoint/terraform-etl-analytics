@@ -307,20 +307,3 @@ resource "aws_glue_trigger" "after_standardization" {
     Name = "cdcu-${var.environment}-after-standardization"
   })
 }
-
-resource "aws_glue_trigger" "processed_matching_after_pipeline_success_event" {
-  count = var.enable_workflow_orchestration && var.enable_processed_matching_crawler_event_trigger ? 1 : 0
-
-  name              = "cdcu-${var.environment}-processed-matching-after-pipeline-success"
-  type              = "EVENT"
-  workflow_name     = aws_glue_workflow.cdcu[0].name
-  start_on_creation = true
-
-  actions {
-    crawler_name = aws_glue_crawler.processed_matching.name
-  }
-
-  tags = merge(var.tags, {
-    Name = "cdcu-${var.environment}-processed-matching-after-pipeline-success"
-  })
-}

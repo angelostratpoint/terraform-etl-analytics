@@ -166,10 +166,22 @@ resource "aws_iam_policy" "glue_s3" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject"
+          "s3:PutObject"
         ]
         Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
+        Sid    = "CDCUGeneratedOutputDeleteAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "${var.data_lake_bucket_arn}/raw/customers/_metadata/*",
+          "${var.data_lake_bucket_arn}/standardized/merged/*",
+          "${var.data_lake_bucket_arn}/processed/matching/*",
+          "${var.data_lake_bucket_arn}/processed/matching_csv/*"
+        ]
       },
       {
         Sid    = "S3DataLakeBucketAccess"
@@ -605,6 +617,15 @@ resource "aws_iam_policy" "sagemaker_access" {
           "ecr:GetDownloadUrlForLayer"
         ]
         Resource = local.sagemaker_processing_ecr_repo_arn
+      },
+      {
+        Sid    = "SageMakerProcessedMatchingCrawlerRefresh"
+        Effect = "Allow"
+        Action = [
+          "glue:GetCrawler",
+          "glue:StartCrawler"
+        ]
+        Resource = "arn:aws:glue:${local.region}:${local.account_id}:crawler/cdcu-${local.env}-processed-matching-crawler"
       }
     ]
   })
@@ -626,6 +647,17 @@ resource "aws_iam_policy" "sagemaker_s3" {
           "s3:PutObject"
         ]
         Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
+        Sid    = "SageMakerGeneratedMatchingOutputDeleteAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "${var.data_lake_bucket_arn}/processed/matching/*",
+          "${var.data_lake_bucket_arn}/processed/matching_csv/*"
+        ]
       },
       {
         Sid      = "SageMakerS3DataLakeListAccess"
@@ -878,7 +910,6 @@ resource "aws_iam_policy" "eventbridge_glue" {
         Sid    = "EventBridgeGlueTargets"
         Effect = "Allow"
         Action = [
-          "glue:notifyEvent",
           "glue:StartCrawler",
           "glue:StartJobRun"
         ]

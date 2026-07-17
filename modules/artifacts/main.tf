@@ -21,6 +21,11 @@ locals {
     file => filemd5("${var.artifacts_base_path}/sagemaker/processing/${file}")
   }
 
+  sagemaker_notebooks = {
+    for file in fileset("${var.artifacts_base_path}/sagemaker/notebooks", "**/*.ipynb") :
+    file => filemd5("${var.artifacts_base_path}/sagemaker/notebooks/${file}")
+  }
+
   sql_files = {
     for file in fileset("${var.artifacts_base_path}/sql/athena", "**/*.sql") :
     file => filemd5("${var.artifacts_base_path}/sql/athena/${file}")
@@ -82,6 +87,21 @@ resource "aws_s3_object" "sagemaker_processing_scripts" {
 
   tags = merge(var.tags, {
     Name        = "${var.environment}/sagemaker-scripts/processing/${each.key}"
+    FileHash    = each.value
+    Environment = var.environment
+  })
+}
+
+resource "aws_s3_object" "sagemaker_notebooks" {
+  for_each = local.sagemaker_notebooks
+
+  bucket = var.scripts_bucket
+  key    = "${var.environment}/sagemaker-notebooks/${each.key}"
+  source = "${var.artifacts_base_path}/sagemaker/notebooks/${each.key}"
+  etag   = each.value
+
+  tags = merge(var.tags, {
+    Name        = "${var.environment}/sagemaker-notebooks/${each.key}"
     FileHash    = each.value
     Environment = var.environment
   })

@@ -18,12 +18,14 @@ locals {
   glue_workflow_arn      = "arn:aws:glue:${local.region}:${local.account_id}:workflow/cdcu-*"
   glue_assets_bucket_arn = "arn:aws:s3:::aws-glue-assets-${local.account_id}-${local.region}"
 
-  sagemaker_processing_job_arn  = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-*"
-  sagemaker_training_job_arn    = "arn:aws:sagemaker:${local.region}:${local.account_id}:training-job/cdcu-*"
-  sagemaker_model_arn           = "arn:aws:sagemaker:${local.region}:${local.account_id}:model/cdcu-*"
-  sagemaker_endpoint_config_arn = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint-config/cdcu-*"
-  sagemaker_endpoint_arn        = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint/cdcu-*"
-  sagemaker_pipeline_arn        = "arn:aws:sagemaker:${local.region}:${local.account_id}:pipeline/cdcu-*"
+  sagemaker_processing_job_arn          = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/cdcu-*"
+  sagemaker_pipeline_processing_job_arn = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/pipelines-*"
+  sagemaker_training_job_arn            = "arn:aws:sagemaker:${local.region}:${local.account_id}:training-job/cdcu-*"
+  sagemaker_model_arn                   = "arn:aws:sagemaker:${local.region}:${local.account_id}:model/cdcu-*"
+  sagemaker_endpoint_config_arn         = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint-config/cdcu-*"
+  sagemaker_endpoint_arn                = "arn:aws:sagemaker:${local.region}:${local.account_id}:endpoint/cdcu-*"
+  sagemaker_pipeline_arn                = "arn:aws:sagemaker:${local.region}:${local.account_id}:pipeline/cdcu-*"
+  sagemaker_processing_ecr_repo_arn     = "arn:aws:ecr:${local.region}:${local.account_id}:repository/cdcu-${local.env}-sagemaker-processing"
 }
 
 ###############################################################################
@@ -549,6 +551,7 @@ resource "aws_iam_policy" "sagemaker_access" {
         ]
         Resource = [
           local.sagemaker_processing_job_arn,
+          local.sagemaker_pipeline_processing_job_arn,
           local.sagemaker_training_job_arn,
           local.sagemaker_model_arn,
           local.sagemaker_endpoint_config_arn,
@@ -570,6 +573,38 @@ resource "aws_iam_policy" "sagemaker_access" {
           "sagemaker:AddTags", "sagemaker:ListTags", "sagemaker:DeleteTags"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "SageMakerPassOwnExecutionRole"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = aws_iam_role.sagemaker_execution.arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "sagemaker.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid    = "SageMakerECRAuthorization"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SageMakerProcessingImagePull"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
+          "ecr:DescribeImages",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+        Resource = local.sagemaker_processing_ecr_repo_arn
       }
     ]
   })
@@ -697,10 +732,6 @@ resource "aws_iam_role_policy_attachment" "sagemaker_athena" {
   policy_arn = aws_iam_policy.athena_access.arn
 }
 
-resource "aws_iam_role_policy_attachment" "sagemaker_deny" {
-  role       = aws_iam_role.sagemaker_execution.name
-  policy_arn = aws_iam_policy.deny_sensitive.arn
-}
 
 ###############################################################################
 # ST-CDCU-AthenaQueryRole

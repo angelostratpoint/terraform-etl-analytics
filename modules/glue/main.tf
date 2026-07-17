@@ -42,9 +42,9 @@ resource "aws_glue_connection" "merged_mysql" {
 
 resource "aws_glue_job" "merged_raw_extraction" {
   name         = "cdcu-${var.environment}-merged-raw-extraction"
-  description  = "Extracts raw customer data from the merged CDCU MySQL source into S3 raw layer"
+  description  = "Extracts raw customer data from the merged CDCU MySQL source into S3 raw layer; aligned with prod_customer_ingestion_job runtime settings"
   role_arn     = var.glue_execution_role_arn
-  glue_version = "4.0"
+  glue_version = "5.1"
 
   command {
     name            = "glueetl"
@@ -54,15 +54,19 @@ resource "aws_glue_job" "merged_raw_extraction" {
 
   default_arguments = {
     "--job-language"                     = "python"
-    "--job-bookmark-option"              = "job-bookmark-enable"
+    "--job-bookmark-option"              = "job-bookmark-disable"
     "--enable-metrics"                   = "true"
     "--enable-continuous-cloudwatch-log" = "true"
     "--enable-spark-ui"                  = "true"
+    "--conf"                             = "spark.eventLog.rolling.enabled=true --conf spark.sql.catalog.glue_catalog.glue.skip-name-validation=true"
     "--TempDir"                          = "s3://${var.data_lake_bucket}/temp/"
     "--SOURCE_CONNECTION"                = aws_glue_connection.merged_mysql.name
-    "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/merged/"
+    "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/customers/"
     "--ENVIRONMENT"                      = var.environment
     "--SECRET_NAME"                      = var.merged_mysql_secret_name
+    "--SOURCE_TABLE"                     = "customers"
+    "--MIN_EXPECTED_ROWS"                = "1000"
+    "--COALESCE_FILES"                   = tostring(var.environment == "sit" ? 1 : 4)
   }
 
   connections = [aws_glue_connection.merged_mysql.name]
@@ -81,9 +85,9 @@ resource "aws_glue_job" "merged_raw_extraction" {
 
 resource "aws_glue_job" "merged_standardization" {
   name         = "cdcu-${var.environment}-merged-standardization"
-  description  = "Standardizes merged source raw data and writes Parquet to S3 standardized layer"
+  description  = "Standardizes merged source raw data and writes Parquet to S3 standardized layer; aligned with prod_customers_standardization_job runtime settings"
   role_arn     = var.glue_execution_role_arn
-  glue_version = "4.0"
+  glue_version = "5.1"
 
   command {
     name            = "glueetl"
@@ -93,12 +97,19 @@ resource "aws_glue_job" "merged_standardization" {
 
   default_arguments = {
     "--job-language"                     = "python"
+    "--job-bookmark-option"              = "job-bookmark-disable"
     "--enable-metrics"                   = "true"
     "--enable-continuous-cloudwatch-log" = "true"
+    "--enable-spark-ui"                  = "true"
+    "--conf"                             = "spark.eventLog.rolling.enabled=true --conf spark.sql.catalog.glue_catalog.glue.skip-name-validation=true"
     "--TempDir"                          = "s3://${var.data_lake_bucket}/temp/"
-    "--SOURCE_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/merged/"
+    "--SOURCE_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/customers/"
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/standardized/merged/"
+    "--INPUT_PATH"                       = "s3://${var.data_lake_bucket}/raw/customers/"
+    "--OUTPUT_PATH"                      = "s3://${var.data_lake_bucket}/standardized/merged/"
     "--ENVIRONMENT"                      = var.environment
+    "--MIN_EXPECTED_ROWS"                = "1000"
+    "--SINGLE_OUTPUT_FILE"               = tostring(var.environment == "sit")
   }
 
   execution_property {
@@ -120,7 +131,7 @@ resource "aws_glue_crawler" "merged_raw" {
   database_name = aws_glue_catalog_database.cdcu.name
 
   s3_target {
-    path = "s3://${var.data_lake_bucket}/raw/merged/"
+    path = "s3://${var.data_lake_bucket}/raw/customers/"
   }
 
   schema_change_policy {
@@ -197,5 +208,102 @@ resource "aws_glue_crawler" "errors" {
 
   tags = merge(var.tags, {
     Name = "cdcu-${var.environment}-errors-crawler"
+  })
+}
+
+resource "aws_glue_workflow" "cdcu" {
+  count = var.enable_workflow_orchestration ? 1 : 0
+
+  name        = "cdcu-${var.environment}-etl-workflow"
+  description = "CDCU ${var.environment} Glue workflow for raw extraction, standardization, and crawler refresh"
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-etl-workflow"
+  })
+}
+
+resource "aws_glue_trigger" "start_raw_extraction" {
+  count = var.enable_workflow_orchestration && !var.enable_workflow_schedule ? 1 : 0
+
+  name          = "cdcu-${var.environment}-start-raw-extraction"
+  type          = "ON_DEMAND"
+  workflow_name = aws_glue_workflow.cdcu[0].name
+
+  actions {
+    job_name = aws_glue_job.merged_raw_extraction.name
+  }
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-start-raw-extraction"
+  })
+}
+
+resource "aws_glue_trigger" "scheduled_raw_extraction" {
+  count = var.enable_workflow_orchestration && var.enable_workflow_schedule ? 1 : 0
+
+  name              = "cdcu-${var.environment}-scheduled-raw-extraction"
+  type              = "SCHEDULED"
+  workflow_name     = aws_glue_workflow.cdcu[0].name
+  schedule          = var.workflow_schedule_expression
+  start_on_creation = true
+
+  actions {
+    job_name = aws_glue_job.merged_raw_extraction.name
+  }
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-scheduled-raw-extraction"
+  })
+}
+
+resource "aws_glue_trigger" "after_raw_extraction" {
+  count = var.enable_workflow_orchestration ? 1 : 0
+
+  name              = "cdcu-${var.environment}-after-raw-extraction"
+  type              = "CONDITIONAL"
+  workflow_name     = aws_glue_workflow.cdcu[0].name
+  start_on_creation = true
+
+  predicate {
+    conditions {
+      job_name = aws_glue_job.merged_raw_extraction.name
+      state    = "SUCCEEDED"
+    }
+  }
+
+  actions {
+    crawler_name = aws_glue_crawler.merged_raw.name
+  }
+
+  actions {
+    job_name = aws_glue_job.merged_standardization.name
+  }
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-after-raw-extraction"
+  })
+}
+
+resource "aws_glue_trigger" "after_standardization" {
+  count = var.enable_workflow_orchestration ? 1 : 0
+
+  name              = "cdcu-${var.environment}-after-standardization"
+  type              = "CONDITIONAL"
+  workflow_name     = aws_glue_workflow.cdcu[0].name
+  start_on_creation = true
+
+  predicate {
+    conditions {
+      job_name = aws_glue_job.merged_standardization.name
+      state    = "SUCCEEDED"
+    }
+  }
+
+  actions {
+    crawler_name = aws_glue_crawler.merged_standardized.name
+  }
+
+  tags = merge(var.tags, {
+    Name = "cdcu-${var.environment}-after-standardization"
   })
 }

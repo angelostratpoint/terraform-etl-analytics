@@ -47,6 +47,18 @@ variable "execution_role_arn" {
   type        = string
 }
 
+variable "eventbridge_role_arn" {
+  description = "IAM role ARN assumed by EventBridge to start the CDCU SageMaker Pipeline"
+  type        = string
+  default     = ""
+}
+
+variable "data_lake_bucket_name" {
+  description = "CDCU data lake bucket name used by the matching pipeline inputs and outputs"
+  type        = string
+  default     = ""
+}
+
 variable "studio_user_profile_names" {
   description = "SageMaker Studio user profiles to create for data scientists"
   type        = list(string)
@@ -74,6 +86,24 @@ variable "studio_space_volume_size_gb" {
   description = "EBS volume size in GB for the JupyterLab space"
   type        = number
   default     = 5
+}
+
+variable "enable_studio_notebook_autosync" {
+  description = "Whether to attach a JupyterLab lifecycle config that syncs repo-managed notebooks from S3 into the Studio workspace on app start"
+  type        = bool
+  default     = false
+}
+
+variable "studio_notebook_s3_uri" {
+  description = "Optional S3 URI containing notebooks to sync into SageMaker JupyterLab. Leave empty to use s3://{data_lake_bucket_name}/{environment}/sagemaker-notebooks/"
+  type        = string
+  default     = ""
+}
+
+variable "studio_notebook_local_path" {
+  description = "Local JupyterLab path where notebooks are synced by the lifecycle config"
+  type        = string
+  default     = "$HOME/cdcu-managed/notebooks/"
 }
 
 variable "enable_notebook_instance" {
@@ -120,6 +150,96 @@ variable "notebook_root_access" {
     condition     = contains(["Enabled", "Disabled"], var.notebook_root_access)
     error_message = "notebook_root_access must be Enabled or Disabled."
   }
+}
+
+variable "enable_matching_pipeline" {
+  description = "Whether to create the CDCU SageMaker matching pipeline for UAT/PROD automation"
+  type        = bool
+  default     = false
+}
+
+variable "matching_pipeline_schedule_enabled" {
+  description = "Whether to create an EventBridge schedule that starts the matching pipeline"
+  type        = bool
+  default     = false
+}
+
+variable "matching_pipeline_glue_success_event_enabled" {
+  description = "Whether to create an EventBridge rule that starts the matching pipeline when the upstream Glue job succeeds"
+  type        = bool
+  default     = false
+}
+
+variable "matching_pipeline_trigger_glue_job_name" {
+  description = "Glue job name whose SUCCEEDED event starts the matching pipeline when glue-success triggering is enabled"
+  type        = string
+  default     = ""
+}
+
+variable "matching_pipeline_schedule_expression" {
+  description = "EventBridge schedule expression for the CDCU SageMaker matching pipeline"
+  type        = string
+  default     = "rate(1 day)"
+}
+
+variable "matching_pipeline_processing_image_uri" {
+  description = "Container image URI used by the SageMaker processing step"
+  type        = string
+  default     = ""
+}
+
+variable "matching_pipeline_processing_script_name" {
+  description = "Processing script filename uploaded under the SageMaker processing artifact prefix"
+  type        = string
+  default     = "matching_prod.py"
+}
+
+variable "matching_pipeline_runner_script_name" {
+  description = "Runner script filename that prepares dependencies before executing the matching script"
+  type        = string
+  default     = "run_matching_prod.py"
+}
+
+variable "matching_pipeline_wheelhouse_s3_uri" {
+  description = "S3 URI containing Python wheelhouse dependencies for the matching processing job"
+  type        = string
+  default     = ""
+}
+
+variable "matching_pipeline_instance_type" {
+  description = "Instance type for the SageMaker matching processing step"
+  type        = string
+  default     = "ml.m5.2xlarge"
+}
+
+variable "matching_pipeline_instance_count" {
+  description = "Instance count for the SageMaker matching processing step"
+  type        = number
+  default     = 1
+}
+
+variable "matching_pipeline_volume_size_gb" {
+  description = "EBS volume size in GB for the SageMaker matching processing step"
+  type        = number
+  default     = 30
+}
+
+variable "matching_pipeline_max_runtime_seconds" {
+  description = "Maximum runtime in seconds for the SageMaker matching processing step"
+  type        = number
+  default     = 14400
+}
+
+variable "matching_pipeline_standardized_s3_uri" {
+  description = "Optional standardized input S3 URI. Leave empty to use s3://{data_lake_bucket_name}/standardized/merged/"
+  type        = string
+  default     = ""
+}
+
+variable "matching_pipeline_output_s3_uri" {
+  description = "Optional matching output S3 URI. Leave empty to use s3://{data_lake_bucket_name}/processed/matching/"
+  type        = string
+  default     = ""
 }
 
 variable "tags" {

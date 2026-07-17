@@ -35,6 +35,10 @@ merged_mysql_secret_name     = "cdcu/sit/merged-mysql-connection"
 mysql_jdbc_driver_class_name = ""
 mysql_jdbc_driver_jar_uri    = ""
 
+enable_glue_workflow_orchestration = false
+enable_glue_workflow_schedule      = false
+glue_workflow_schedule_expression  = "cron(0 18 * * ? *)" # 2:00 AM Asia/Manila daily
+
 git_repository_url = "https://git-codecommit.ap-southeast-1.amazonaws.com/v1/repos/cdcu"
 
 enable_sagemaker_unified_studio = true
@@ -51,6 +55,26 @@ sagemaker_notebook_instance_type          = "ml.m5.2xlarge"
 sagemaker_notebook_volume_size_gb         = 5
 sagemaker_notebook_direct_internet_access = "Disabled"
 sagemaker_notebook_root_access            = "Disabled"
+
+enable_sagemaker_matching_pipeline          = false
+enable_sagemaker_matching_pipeline_schedule = false
+enable_sagemaker_matching_pipeline_glue_success_event = false
+sagemaker_matching_pipeline_schedule_expression = "rate(1 day)"
+sagemaker_matching_pipeline_processing_image_uri = ""
+enable_sagemaker_processing_image_repository = false
+enable_sagemaker_processing_image_build = false
+sagemaker_processing_image_repository_name = "cdcu-sit-sagemaker-processing"
+sagemaker_processing_image_tag = "py312"
+sagemaker_processing_image_force_delete = true
+sagemaker_matching_pipeline_processing_script_name = "matching_prod.py"
+sagemaker_matching_pipeline_runner_script_name = "run_matching_prod.py"
+sagemaker_matching_pipeline_wheelhouse_s3_uri = ""
+sagemaker_matching_pipeline_instance_type          = "ml.m5.2xlarge"
+sagemaker_matching_pipeline_instance_count         = 1
+sagemaker_matching_pipeline_volume_size_gb         = 30
+sagemaker_matching_pipeline_max_runtime_seconds    = 14400
+sagemaker_matching_pipeline_standardized_s3_uri    = ""
+sagemaker_matching_pipeline_output_s3_uri          = ""
 
 enable_quicksight              = false
 quicksight_admin_principal_arn = ""

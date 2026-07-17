@@ -53,8 +53,13 @@ variable "merged_jdbc_url" {
   type        = string
 
   validation {
-    condition     = startswith(var.merged_jdbc_url, "jdbc:mysql://") && !can(regex("localhost", lower(var.merged_jdbc_url)))
-    error_message = "merged_jdbc_url must be a non-local MySQL JDBC URL from BPI-MS."
+    condition = (
+      startswith(var.merged_jdbc_url, "jdbc:mysql://")
+      && !can(regex("localhost", lower(var.merged_jdbc_url)))
+      && !can(regex("example\\.com", lower(var.merged_jdbc_url)))
+      && !can(regex("<.*>", var.merged_jdbc_url))
+    )
+    error_message = "merged_jdbc_url must be the approved non-placeholder BPI-MS MySQL JDBC URL."
   }
 }
 
@@ -83,6 +88,24 @@ variable "mysql_jdbc_driver_jar_uri" {
     condition     = var.mysql_jdbc_driver_jar_uri == "" || startswith(var.mysql_jdbc_driver_jar_uri, "s3://")
     error_message = "mysql_jdbc_driver_jar_uri must be blank or an s3:// URI."
   }
+}
+
+variable "enable_workflow_orchestration" {
+  description = "Whether to provision the CDCU Glue workflow and triggers for raw extraction, standardization, and crawler refresh"
+  type        = bool
+  default     = false
+}
+
+variable "enable_workflow_schedule" {
+  description = "Whether to provision a scheduled Glue trigger that starts the CDCU Glue workflow"
+  type        = bool
+  default     = false
+}
+
+variable "workflow_schedule_expression" {
+  description = "Glue cron/rate expression for the scheduled workflow trigger. AWS evaluates cron schedules in UTC."
+  type        = string
+  default     = "cron(0 18 * * ? *)"
 }
 
 variable "tags" {

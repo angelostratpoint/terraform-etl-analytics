@@ -23,6 +23,16 @@ output "glue_crawler_names" {
   value       = module.glue.crawler_names
 }
 
+output "glue_workflow_name" {
+  description = "CDCU Glue workflow name"
+  value       = module.glue.workflow_name
+}
+
+output "glue_workflow_trigger_names" {
+  description = "CDCU Glue workflow trigger names"
+  value       = module.glue.workflow_trigger_names
+}
+
 output "external_role_arns" {
   description = "Client-managed IAM role ARNs consumed by this Terraform deployment"
   value = {
@@ -78,9 +88,48 @@ output "sagemaker_studio_space_names" {
   value       = module.sagemaker.studio_space_names
 }
 
+output "sagemaker_notebook_autosync" {
+  description = "SageMaker JupyterLab notebook autosync lifecycle configuration"
+  value = {
+    lifecycle_config_arn = module.sagemaker.studio_notebook_autosync_lifecycle_config_arn
+    s3_uri               = module.sagemaker.studio_notebook_autosync_s3_uri
+    local_path           = module.sagemaker.studio_notebook_autosync_local_path
+  }
+}
+
 output "sagemaker_notebook_instance_name" {
   description = "Classic SageMaker Notebook Instance name"
   value       = module.sagemaker.notebook_instance_name
+}
+
+output "sagemaker_matching_pipeline_name" {
+  description = "CDCU SageMaker matching pipeline name"
+  value       = module.sagemaker.matching_pipeline_name
+}
+
+output "sagemaker_matching_pipeline_arn" {
+  description = "CDCU SageMaker matching pipeline ARN"
+  value       = module.sagemaker.matching_pipeline_arn
+}
+
+output "sagemaker_matching_pipeline_schedule_rule_name" {
+  description = "EventBridge schedule rule name for the CDCU SageMaker matching pipeline"
+  value       = module.sagemaker.matching_pipeline_schedule_rule_name
+}
+
+output "sagemaker_matching_pipeline_glue_success_rule_name" {
+  description = "EventBridge Glue-success rule name for the CDCU SageMaker matching pipeline"
+  value       = module.sagemaker.matching_pipeline_glue_success_rule_name
+}
+
+output "sagemaker_processing_image" {
+  description = "Terraform-managed SageMaker Processing ECR image information"
+  value = {
+    repository_name = module.sagemaker_processing_image.repository_name
+    repository_url  = module.sagemaker_processing_image.repository_url
+    image_uri       = module.sagemaker_processing_image.image_uri
+    build_enabled   = module.sagemaker_processing_image.build_enabled
+  }
 }
 
 output "quicksight_data_source_arn" {
@@ -109,6 +158,7 @@ output "artifacts_uploaded" {
     glue_standardization = module.artifacts.glue_standardization_script_count
     sagemaker_matching   = module.artifacts.sagemaker_matching_script_count
     sagemaker_processing = module.artifacts.sagemaker_processing_script_count
+    sagemaker_notebooks  = module.artifacts.sagemaker_notebook_count
     sql                  = module.artifacts.sql_file_count
   }
 }

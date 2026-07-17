@@ -18,6 +18,11 @@ output "sagemaker_processing_script_count" {
   value       = length(aws_s3_object.sagemaker_processing_scripts)
 }
 
+output "sagemaker_notebook_count" {
+  description = "Number of SageMaker notebooks uploaded"
+  value       = length(aws_s3_object.sagemaker_notebooks)
+}
+
 output "sql_file_count" {
   description = "Number of SQL files uploaded"
   value       = length(aws_s3_object.sql_files)
@@ -41,4 +46,9 @@ output "sagemaker_matching_script_s3_prefix" {
 output "sagemaker_processing_script_s3_prefix" {
   description = "S3 prefix where SageMaker processing scripts are stored"
   value       = "${var.environment}/sagemaker-scripts/processing/"
+}
+
+output "sagemaker_notebook_s3_prefix" {
+  description = "S3 prefix where SageMaker notebooks are stored"
+  value       = "${var.environment}/sagemaker-notebooks/"
 }

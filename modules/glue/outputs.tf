@@ -35,3 +35,18 @@ output "merged_mysql_connection_name" {
   description = "Name of the merged MySQL Glue connection"
   value       = aws_glue_connection.merged_mysql.name
 }
+
+output "workflow_name" {
+  description = "Name of the CDCU Glue workflow when workflow orchestration is enabled"
+  value       = var.enable_workflow_orchestration ? aws_glue_workflow.cdcu[0].name : null
+}
+
+output "workflow_trigger_names" {
+  description = "Names of the CDCU Glue workflow triggers when workflow orchestration is enabled"
+  value = var.enable_workflow_orchestration ? concat(
+    aws_glue_trigger.start_raw_extraction[*].name,
+    aws_glue_trigger.scheduled_raw_extraction[*].name,
+    aws_glue_trigger.after_raw_extraction[*].name,
+    aws_glue_trigger.after_standardization[*].name,
+  ) : []
+}

@@ -2,6 +2,11 @@ locals {
   environment = var.environment
   subnet_ids  = distinct(compact(concat([var.subnet_id], var.subnet_ids)))
   kms_key_arn = var.enable_kms ? var.existing_kms_key_arn : ""
+  sagemaker_matching_pipeline_processing_image_uri = (
+    var.sagemaker_matching_pipeline_processing_image_uri != ""
+    ? var.sagemaker_matching_pipeline_processing_image_uri
+    : module.sagemaker_processing_image.image_uri
+  )
   common_tags = {
     Project     = "CDCU"
     Environment = local.environment
@@ -72,6 +77,9 @@ module "glue" {
   merged_mysql_secret_name     = var.merged_mysql_secret_name
   mysql_jdbc_driver_class_name = var.mysql_jdbc_driver_class_name
   mysql_jdbc_driver_jar_uri    = var.mysql_jdbc_driver_jar_uri
+  enable_workflow_orchestration = var.enable_glue_workflow_orchestration
+  enable_workflow_schedule      = var.enable_glue_workflow_schedule
+  workflow_schedule_expression  = var.glue_workflow_schedule_expression
   tags                         = local.common_tags
 
   depends_on = [terraform_data.manual_baseline_contract, module.iam]
@@ -88,6 +96,18 @@ module "athena" {
   tags                  = local.common_tags
 }
 
+module "sagemaker_processing_image" {
+  source = "../../modules/sagemaker-processing-image"
+
+  enabled             = var.enable_sagemaker_processing_image_repository
+  build_and_push      = var.enable_sagemaker_processing_image_build
+  repository_name     = var.sagemaker_processing_image_repository_name != "" ? var.sagemaker_processing_image_repository_name : "cdcu-${local.environment}-sagemaker-processing"
+  image_tag           = var.sagemaker_processing_image_tag
+  docker_context_path = abspath("${path.module}/../../docker/sagemaker-processing")
+  force_delete        = var.sagemaker_processing_image_force_delete
+  tags                = local.common_tags
+}
+
 module "sagemaker" {
   source = "../../modules/sagemaker"
 
@@ -99,19 +119,39 @@ module "sagemaker" {
   subnet_ids                     = local.subnet_ids
   security_group_ids             = [var.existing_security_group_id]
   execution_role_arn             = module.iam.sagemaker_execution_role_arn
+  eventbridge_role_arn           = module.iam.eventbridge_glue_role_arn
+  data_lake_bucket_name          = module.s3.data_lake_bucket_name
   studio_user_profile_names      = var.sagemaker_studio_user_profile_names
   studio_app_network_access_type = var.sagemaker_studio_app_network_access_type
   studio_space_instance_type     = var.sagemaker_studio_space_instance_type
   studio_space_volume_size_gb    = var.sagemaker_studio_space_volume_size_gb
+  enable_studio_notebook_autosync = var.enable_studio_notebook_autosync
+  studio_notebook_s3_uri          = var.studio_notebook_s3_uri
+  studio_notebook_local_path      = var.studio_notebook_local_path
   enable_notebook_instance        = var.enable_sagemaker_notebook_instance
   notebook_instance_name          = var.sagemaker_notebook_instance_name
   notebook_instance_type          = var.sagemaker_notebook_instance_type
   notebook_volume_size_gb         = var.sagemaker_notebook_volume_size_gb
   notebook_direct_internet_access = var.sagemaker_notebook_direct_internet_access
   notebook_root_access            = var.sagemaker_notebook_root_access
+  enable_matching_pipeline        = var.enable_sagemaker_matching_pipeline
+  matching_pipeline_schedule_enabled        = var.enable_sagemaker_matching_pipeline_schedule
+  matching_pipeline_glue_success_event_enabled = var.enable_sagemaker_matching_pipeline_glue_success_event
+  matching_pipeline_trigger_glue_job_name      = module.glue.merged_standardization_job_name
+  matching_pipeline_schedule_expression     = var.sagemaker_matching_pipeline_schedule_expression
+  matching_pipeline_processing_image_uri    = local.sagemaker_matching_pipeline_processing_image_uri
+  matching_pipeline_processing_script_name  = var.sagemaker_matching_pipeline_processing_script_name
+  matching_pipeline_runner_script_name      = var.sagemaker_matching_pipeline_runner_script_name
+  matching_pipeline_wheelhouse_s3_uri       = var.sagemaker_matching_pipeline_wheelhouse_s3_uri
+  matching_pipeline_instance_type           = var.sagemaker_matching_pipeline_instance_type
+  matching_pipeline_instance_count          = var.sagemaker_matching_pipeline_instance_count
+  matching_pipeline_volume_size_gb          = var.sagemaker_matching_pipeline_volume_size_gb
+  matching_pipeline_max_runtime_seconds     = var.sagemaker_matching_pipeline_max_runtime_seconds
+  matching_pipeline_standardized_s3_uri     = var.sagemaker_matching_pipeline_standardized_s3_uri
+  matching_pipeline_output_s3_uri           = var.sagemaker_matching_pipeline_output_s3_uri
   tags                           = local.common_tags
 
-  depends_on = [terraform_data.manual_baseline_contract, module.iam]
+  depends_on = [terraform_data.manual_baseline_contract, module.iam, module.sagemaker_processing_image]
 }
 
 module "quicksight" {

@@ -131,6 +131,24 @@ variable "mysql_jdbc_driver_jar_uri" {
   }
 }
 
+variable "enable_glue_workflow_orchestration" {
+  description = "Whether to provision the CDCU Glue workflow and triggers for raw extraction, standardization, and crawler refresh"
+  type        = bool
+  default     = false
+}
+
+variable "enable_glue_workflow_schedule" {
+  description = "Whether to provision a scheduled Glue trigger that starts the CDCU Glue workflow"
+  type        = bool
+  default     = false
+}
+
+variable "glue_workflow_schedule_expression" {
+  description = "Glue cron/rate expression for the scheduled workflow trigger. AWS evaluates cron schedules in UTC."
+  type        = string
+  default     = "cron(0 18 * * ? *)"
+}
+
 variable "git_repository_url" {
   description = "HTTPS URL of the GitHub repository for SageMaker code repository"
   type        = string
@@ -158,6 +176,24 @@ variable "sagemaker_studio_space_volume_size_gb" {
   description = "EBS volume size in GB for the JupyterLab space"
   type        = number
   default     = 5
+}
+
+variable "enable_studio_notebook_autosync" {
+  description = "Whether to sync repo-managed notebooks from S3 into SageMaker JupyterLab on app start"
+  type        = bool
+  default     = false
+}
+
+variable "studio_notebook_s3_uri" {
+  description = "Optional S3 URI containing notebooks to sync into SageMaker JupyterLab"
+  type        = string
+  default     = ""
+}
+
+variable "studio_notebook_local_path" {
+  description = "Local JupyterLab path where notebooks are synced by the lifecycle config"
+  type        = string
+  default     = "$HOME/cdcu-managed/notebooks/"
 }
 
 variable "sagemaker_studio_app_network_access_type" {
@@ -200,6 +236,120 @@ variable "sagemaker_notebook_root_access" {
   description = "Root access setting for the classic SageMaker Notebook Instance"
   type        = string
   default     = "Disabled"
+}
+
+variable "enable_sagemaker_matching_pipeline" {
+  description = "Whether to provision the CDCU SageMaker matching pipeline"
+  type        = bool
+  default     = false
+}
+
+variable "enable_sagemaker_matching_pipeline_schedule" {
+  description = "Whether to create an EventBridge schedule for the CDCU SageMaker matching pipeline"
+  type        = bool
+  default     = false
+}
+
+variable "enable_sagemaker_matching_pipeline_glue_success_event" {
+  description = "Whether to create an EventBridge rule that starts the CDCU SageMaker matching pipeline when the standardization Glue job succeeds"
+  type        = bool
+  default     = false
+}
+
+variable "sagemaker_matching_pipeline_schedule_expression" {
+  description = "EventBridge schedule expression for the CDCU SageMaker matching pipeline"
+  type        = string
+  default     = "rate(1 day)"
+}
+
+variable "sagemaker_matching_pipeline_processing_image_uri" {
+  description = "Container image URI used by the CDCU SageMaker matching pipeline processing step"
+  type        = string
+  default     = ""
+}
+
+variable "enable_sagemaker_processing_image_repository" {
+  description = "Whether to create an ECR repository for the CDCU SageMaker Processing image"
+  type        = bool
+  default     = false
+}
+
+variable "enable_sagemaker_processing_image_build" {
+  description = "Whether Terraform should build and push the CDCU SageMaker Processing Docker image using local Docker and AWS CLI"
+  type        = bool
+  default     = false
+}
+
+variable "sagemaker_processing_image_repository_name" {
+  description = "Optional ECR repository name for the CDCU SageMaker Processing image. Leave empty to use cdcu-{environment}-sagemaker-processing."
+  type        = string
+  default     = ""
+}
+
+variable "sagemaker_processing_image_tag" {
+  description = "Docker image tag for the CDCU SageMaker Processing image"
+  type        = string
+  default     = "py312"
+}
+
+variable "sagemaker_processing_image_force_delete" {
+  description = "Whether terraform destroy should delete the ECR repository even when it contains images"
+  type        = bool
+  default     = true
+}
+
+variable "sagemaker_matching_pipeline_processing_script_name" {
+  description = "Processing script filename uploaded under the SageMaker processing artifact prefix"
+  type        = string
+  default     = "matching_prod.py"
+}
+
+variable "sagemaker_matching_pipeline_runner_script_name" {
+  description = "Runner script filename that prepares dependencies before executing the matching script"
+  type        = string
+  default     = "run_matching_prod.py"
+}
+
+variable "sagemaker_matching_pipeline_wheelhouse_s3_uri" {
+  description = "Optional S3 URI for Python wheelhouse dependencies used by the matching processing job"
+  type        = string
+  default     = ""
+}
+
+variable "sagemaker_matching_pipeline_instance_type" {
+  description = "Instance type for the CDCU SageMaker matching processing step"
+  type        = string
+  default     = "ml.m5.2xlarge"
+}
+
+variable "sagemaker_matching_pipeline_instance_count" {
+  description = "Instance count for the CDCU SageMaker matching processing step"
+  type        = number
+  default     = 1
+}
+
+variable "sagemaker_matching_pipeline_volume_size_gb" {
+  description = "EBS volume size in GB for the CDCU SageMaker matching processing step"
+  type        = number
+  default     = 30
+}
+
+variable "sagemaker_matching_pipeline_max_runtime_seconds" {
+  description = "Maximum runtime in seconds for the CDCU SageMaker matching processing step"
+  type        = number
+  default     = 14400
+}
+
+variable "sagemaker_matching_pipeline_standardized_s3_uri" {
+  description = "Optional standardized input S3 URI for the matching pipeline"
+  type        = string
+  default     = ""
+}
+
+variable "sagemaker_matching_pipeline_output_s3_uri" {
+  description = "Optional matching output S3 URI for the matching pipeline"
+  type        = string
+  default     = ""
 }
 
 # Disabled by default. Validate the target account's QuickSight access model before enabling.

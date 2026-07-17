@@ -85,6 +85,10 @@ scripts/
 privilege-results.txt
 *.txt
 
+# Raw data files (never commit actual data to repo)
+artifacts/data/
+*.csv
+
 # Excel and Office files
 *.xlsx
 *.xls

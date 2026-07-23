@@ -75,7 +75,11 @@ terraform-etl-analytics/
 |   `-- sagemaker/
 `-- docs/
     |-- bootstrap-guide.md      # Remote state backend setup
-    `-- deployment-guide.md     # Environment deployment steps
+    |-- deployment-guide.md     # Environment deployment steps
+    |-- prod-deployment-mop-runbook.md # Production MOP and operational runbook
+    |-- terraform-vpc-production-readiness.md
+    |-- iam-service-role-reference.md
+    `-- runtime-connectivity-validation.md
 ```
 
 Enterprise KMS, security groups, Secrets Manager secret values, Lake Formation account governance, and CloudWatch account governance remain outside the Terraform workload scope. Active environment roots instantiate only the CDCU service-layer modules listed above.
@@ -91,8 +95,9 @@ Use the retained BPI-MS handoff guides for setup and deployment:
 | `docs/terraform-vpc-production-readiness.md` | Detailed Terraform architecture, `vpc-assessment.yaml`, ownership boundaries, and production-readiness checklist |
 | `docs/iam-service-role-reference.md` | Current human group, service role, PassRole, Lake Formation, and IAM validation reference |
 | `docs/runtime-connectivity-validation.md` | Runtime connectivity and service smoke tests |
+| `docs/prod-deployment-mop-runbook.md` | Production Method of Procedure, operational runbook, validation commands, rollback guidance, and sign-off checklist |
 
-For production technical review, start with `docs/terraform-vpc-production-readiness.md`. IAM user/group documentation is summarized separately in `docs/iam-service-role-reference.md`.
+For production technical review, start with `docs/terraform-vpc-production-readiness.md`. For the actual production change window after UAT sign-off, use `docs/prod-deployment-mop-runbook.md` as the MOP. IAM user/group documentation is summarized separately in `docs/iam-service-role-reference.md`.
 
 ## Required External Inputs
 

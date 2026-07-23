@@ -24,6 +24,7 @@ documentation set:
 | `docs/iam-service-role-reference.md` | IAM groups, runtime roles, PassRole boundaries, and validation approach |
 | `docs/runtime-connectivity-validation.md` | Runtime connectivity, control-plane validation, and smoke-test procedures |
 | `docs/terraform-vpc-production-readiness.md` | Architecture, ownership boundary, `vpc-assessment.yaml`, and production-readiness checklist |
+| `docs/prod-deployment-mop-runbook.md` | Production MOP, operational runbook, post-UAT promotion steps, validation evidence, and rollback guidance |
 
 ## Deployment Coverage
 
@@ -49,9 +50,11 @@ For technical review and deployment planning, use the following reading order:
 4. `docs/iam-service-role-reference.md`
 5. `docs/runtime-connectivity-validation.md`
 6. `docs/bootstrap-guide.md`
+7. `docs/prod-deployment-mop-runbook.md`
 
 This sequence helps reviewers understand the architecture first, then the
-deployment steps, then the access model, runtime checks, and backend setup.
+deployment steps, then the access model, runtime checks, backend setup, and
+finally the post-UAT production execution procedure.
 
 ## Environment Deployment Summary
 
@@ -107,3 +110,5 @@ Approved by: Aubrey S. Macaspac
 - If any detailed technical procedure changes, the corresponding source
   document under `docs/` should be updated first, then this handoff guide
   should be aligned if necessary.
+- For production promotion after UAT sign-off, use
+  `docs/prod-deployment-mop-runbook.md` as the change-window MOP.

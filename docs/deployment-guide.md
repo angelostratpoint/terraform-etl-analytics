@@ -123,6 +123,12 @@ For production, run the same flow from `environments/prod`.
 
 Run Terraform from the environment folder only. Running `terraform init`, `validate`, or `plan` from the repository root will not validate this project because the root folder is not a Terraform root module.
 
+For the approved production change window after UAT sign-off, use
+`docs/prod-deployment-mop-runbook.md` as the step-by-step MOP. That runbook
+contains the production entry criteria, SageMaker linux/amd64 image build
+guidance, full E2E validation commands, Athena smoke queries, rollback notes,
+and evidence capture checklist.
+
 ## Post-Deployment Checks
 
 ```bash

@@ -39,7 +39,7 @@ resource "terraform_data" "build_and_push" {
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
-    command = <<-EOT
+    command     = <<-EOT
       set -euo pipefail
 
       aws ecr get-login-password --region ${data.aws_region.current.name} \

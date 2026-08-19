@@ -27,15 +27,15 @@ locals {
         Arguments = {
           RoleArn = var.execution_role_arn
           AppSpecification = {
-            ImageUri             = var.matching_pipeline_processing_image_uri
-            ContainerEntrypoint  = ["python3", "/opt/ml/processing/input/code/${var.matching_pipeline_runner_script_name}"]
+            ImageUri            = var.matching_pipeline_processing_image_uri
+            ContainerEntrypoint = ["python3", "/opt/ml/processing/input/code/${var.matching_pipeline_runner_script_name}"]
           }
           Environment = {
-            CDCU_ENVIRONMENT            = var.environment
-            CDCU_DATA_LAKE_BUCKET       = var.data_lake_bucket_name
-            CDCU_STANDARDIZED_S3_URI    = local.matching_standardized_s3_uri
-            CDCU_MATCHING_OUTPUT_S3_URI = local.matching_output_s3_uri
-            CDCU_MATCHING_SCRIPT_NAME   = var.matching_pipeline_processing_script_name
+            CDCU_ENVIRONMENT                     = var.environment
+            CDCU_DATA_LAKE_BUCKET                = var.data_lake_bucket_name
+            CDCU_STANDARDIZED_S3_URI             = local.matching_standardized_s3_uri
+            CDCU_MATCHING_OUTPUT_S3_URI          = local.matching_output_s3_uri
+            CDCU_MATCHING_SCRIPT_NAME            = var.matching_pipeline_processing_script_name
             CDCU_PROCESSED_MATCHING_CRAWLER_NAME = local.matching_processed_crawler_name
           }
           ProcessingResources = {
@@ -241,10 +241,10 @@ resource "aws_sagemaker_notebook_instance" "classic" {
 resource "aws_sagemaker_pipeline" "matching" {
   count = var.enable_matching_pipeline ? 1 : 0
 
-  pipeline_name        = local.matching_pipeline_name
+  pipeline_name         = local.matching_pipeline_name
   pipeline_display_name = "CDCU-${var.environment}-Matching-Pipeline"
-  role_arn             = var.execution_role_arn
-  pipeline_definition  = jsonencode(local.matching_pipeline_definition)
+  role_arn              = var.execution_role_arn
+  pipeline_definition   = jsonencode(local.matching_pipeline_definition)
 
   tags = merge(var.tags, {
     Name = local.matching_pipeline_name

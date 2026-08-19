@@ -1,5 +1,5 @@
 locals {
-  bucket_name                 = var.data_lake_bucket_name != "" ? var.data_lake_bucket_name : "cdcu-${var.environment}-data-lake"
+  bucket_name                = var.data_lake_bucket_name != "" ? var.data_lake_bucket_name : "cdcu-${var.environment}-data-lake"
   athena_results_bucket_name = var.athena_results_bucket_name != "" ? var.athena_results_bucket_name : "cdcu-${var.environment}-athena-results"
 }
 

@@ -680,6 +680,9 @@ Resources:
               - sagemaker:ListModels
               - sagemaker:ListClusters
               - sagemaker:ListNotebookInstances
+              - sagemaker:ListPipelines
+              - sagemaker:ListPipelineExecutions
+              - sagemaker:ListPipelineExecutionSteps
               - sagemaker:ListDomains
               - sagemaker:DescribeDomain
               - sagemaker:ListUserProfiles
@@ -724,6 +727,13 @@ Resources:
               - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/cdcu-${Environment}-*"
               - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint-config/cdcu-${Environment}-*"
               - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:notebook-instance/cdcu-${Environment}-*"
+
+          - Sid: SageMakerMonitoringReadAccess
+            Effect: Allow
+            Action:
+              - sagemaker:DescribeProcessingJob
+            Resource:
+              - !Sub "arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/*"
 
           - Sid: SageMakerControlledExecution
             Effect: Allow

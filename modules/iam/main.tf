@@ -576,6 +576,8 @@ resource "aws_iam_policy" "sagemaker_access" {
         Effect = "Allow"
         Action = [
           "sagemaker:ListProcessingJobs", "sagemaker:ListTrainingJobs",
+          "sagemaker:ListPipelines", "sagemaker:ListPipelineExecutions",
+          "sagemaker:ListPipelineExecutionSteps",
           "sagemaker:ListSpaces", "sagemaker:DescribeSpace",
           "sagemaker:ListApps", "sagemaker:DescribeApp",
           "sagemaker:CreateApp", "sagemaker:DeleteApp",
@@ -585,6 +587,14 @@ resource "aws_iam_policy" "sagemaker_access" {
           "sagemaker:AddTags", "sagemaker:ListTags", "sagemaker:DeleteTags"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "SageMakerMonitoringReadAccess"
+        Effect = "Allow"
+        Action = [
+          "sagemaker:DescribeProcessingJob"
+        ]
+        Resource = "arn:aws:sagemaker:${local.region}:${local.account_id}:processing-job/*"
       },
       {
         Sid    = "SageMakerPassOwnExecutionRole"
@@ -702,6 +712,16 @@ resource "aws_iam_policy" "sagemaker_cloudwatch" {
         Action = [
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchSageMakerMetricRead"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:ListMetrics"
         ]
         Resource = "*"
       }
@@ -1341,9 +1361,9 @@ resource "aws_iam_policy" "de_passrole" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowOnlyApprovedSageMakerExecutionRoles"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowOnlyApprovedSageMakerExecutionRoles"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-SageMakerExecutionRole"
         Condition = {
           StringEquals = {
@@ -1352,9 +1372,9 @@ resource "aws_iam_policy" "de_passrole" {
         }
       },
       {
-        Sid    = "AllowOnlyApprovedGlueExecutionRoles"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowOnlyApprovedGlueExecutionRoles"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-GlueExecutionRole"
         Condition = {
           StringEquals = {
@@ -1363,9 +1383,9 @@ resource "aws_iam_policy" "de_passrole" {
         }
       },
       {
-        Sid    = "AllowOnlyApprovedEventBridgeGlueRoles"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowOnlyApprovedEventBridgeGlueRoles"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = "arn:aws:iam::${local.account_id}:role/ST-CDCU-${local.env}-EventBridgeGlueRole"
         Condition = {
           StringEquals = {
@@ -1416,9 +1436,9 @@ resource "aws_iam_policy" "de_glue_console" {
         Resource = "*"
       },
       {
-        Sid    = "GlueStudioIAMRoleDiscovery"
-        Effect = "Allow"
-        Action = ["iam:ListRoles"]
+        Sid      = "GlueStudioIAMRoleDiscovery"
+        Effect   = "Allow"
+        Action   = ["iam:ListRoles"]
         Resource = "*"
       }
     ]
@@ -1623,8 +1643,8 @@ resource "aws_iam_policy" "qa_access" {
         Resource = "${var.data_lake_bucket_arn}/*"
       },
       {
-        Sid      = "S3AthenaResultsRead"
-        Effect   = "Allow"
+        Sid    = "S3AthenaResultsRead"
+        Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject"
@@ -1632,8 +1652,8 @@ resource "aws_iam_policy" "qa_access" {
         Resource = "${var.athena_results_bucket_arn}/*"
       },
       {
-        Sid      = "S3AthenaResultsList"
-        Effect   = "Allow"
+        Sid    = "S3AthenaResultsList"
+        Effect = "Allow"
         Action = [
           "s3:GetBucketLocation",
           "s3:ListBucket"

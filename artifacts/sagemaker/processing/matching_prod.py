@@ -251,8 +251,8 @@ df.head()
 deduped_input_df = df.copy()
 deduped_input_df["run_date"] = RUN_DATE
 
-deduped_input_df.to_csv("sit_deduped_input.csv", index=False)
-print(f"sit_deduped_input.csv : {len(deduped_input_df):,} records (scoring input)")
+deduped_input_df.to_csv("deduped_input.csv", index=False)
+print(f"deduped_input.csv : {len(deduped_input_df):,} records (scoring input)")
 print(f"  Columns: {list(deduped_input_df.columns)}")
 
 
@@ -640,7 +640,7 @@ def evaluate_pair(left, right):
         conflicts.append("shared_mobile_diff_person")
     if name_match and dob_conf:
         conflicts.append("same_name_diff_dob")
-    if addr_exact and sur_match and giv_diff:    # ← addr_exact, hindi addr_match
+    if addr_exact and sur_match and giv_diff:    # addr_exact, hindi addr_match
         conflicts.append("same_household_diff_first_name")  
     hard_conflict = len(conflicts) > 0
   
@@ -795,16 +795,19 @@ pairs_df = score_all_pairs(df, candidates)
 merge_df   = pairs_df[pairs_df["classification"] == "MERGE"].reset_index(drop=True)
 eyeball_df = pairs_df[pairs_df["classification"] == "EYEBALL"].reset_index(drop=True)
 
+# Keep record-level outputs aligned with the complete customer details used by
+# merge_review and eyeball_review.
+REVIEW_FIELDS = ["record_id", "surname", "givenname", "dob", "address",
+                 "email", "mobileno", "homeno", "officeno", "postal",
+                 "event_timestamp"]
+
 # record-level UNIQUE = records never in a MERGE/EYEBALL pair
 matched_ids = (
     set(merge_df["record_id_left"]) | set(merge_df["record_id_right"])
     | set(eyeball_df["record_id_left"]) | set(eyeball_df["record_id_right"])
 )
 unique_df = df[~df["record_id"].isin(matched_ids)].copy()
-unique_df = unique_df[
-    ["record_id", "surname", "givenname", "dob", "email",
-     "mobileno", "event_timestamp"]
-].reset_index(drop=True)
+unique_df = unique_df.reset_index(drop=True)
 unique_df["classification"] = "UNIQUE"
 unique_df["reason_code"]    = "no_duplicate_found"
 unique_df["run_date"]       = RUN_DATE
@@ -954,19 +957,16 @@ if len(clusters_df):
 else:
     print("No clusters (no MERGE pairs).")
 
-merge_df.to_csv("sit_merge_pairs.csv", index=False)
-eyeball_df.to_csv("sit_eyeball_pairs.csv", index=False)
-unique_df.to_csv("sit_unique_records.csv", index=False)
-survivor_df.to_csv("sit_merge_survivors.csv", index=False)
+merge_df.to_csv("merge_pairs.csv", index=False)
+eyeball_df.to_csv("eyeball_pairs.csv", index=False)
+unique_df.to_csv("unique_records.csv", index=False)
+survivor_df.to_csv("merge_survivors.csv", index=False)
 if "clusters_df" in globals() and len(clusters_df):
-    clusters_df.to_csv("sit_clusters.csv", index=False)
-print("Wrote: sit_merge_pairs.csv, sit_eyeball_pairs.csv, sit_unique_records.csv,")
-print("       sit_merge_survivors.csv, sit_clusters.csv")
+    clusters_df.to_csv("clusters.csv", index=False)
+print("Wrote: merge_pairs.csv, eyeball_pairs.csv, unique_records.csv,")
+print("       merge_survivors.csv, clusters.csv")
 
 # ---- Build reviewer-ready output: pairs + record details side by side ----
-REVIEW_FIELDS = ["record_id", "surname", "givenname", "dob", "address",
-                 "email", "mobileno", "homeno", "officeno", "postal", "event_timestamp"]
-
 def build_review_output(pairs, source_df):
     """Join pair results with full record details from both left and right sides."""
     if pairs.empty:
@@ -1007,11 +1007,11 @@ merge_review  = build_review_output(merge_df, df)
 eyeball_review = build_review_output(eyeball_df, df)
 
 # Save locally
-merge_review.to_csv("sit_merge_review.csv", index=False)
-eyeball_review.to_csv("sit_eyeball_review.csv", index=False)
+merge_review.to_csv("merge_review.csv", index=False)
+eyeball_review.to_csv("eyeball_review.csv", index=False)
 
-print(f"sit_merge_review.csv   : {len(merge_review):,} pairs with full record details")
-print(f"sit_eyeball_review.csv : {len(eyeball_review):,} pairs with full record details")
+print(f"merge_review.csv   : {len(merge_review):,} pairs with full record details")
+print(f"eyeball_review.csv : {len(eyeball_review):,} pairs with full record details")
 print()
 print("Columns per row:")
 print(f"  Pair info: pair_id, match_score, classification, reason_code, ...")
@@ -1042,35 +1042,27 @@ _clusters_df = clusters_df if "clusters_df" in globals() else pd.DataFrame()
 OUT = {
     "merge": (
         merge_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/merge_sagemaker/",
+        f"{OUTPUT_BASE}/merge_sagemaker/run_date={RUN_DATE}/",
     ),
     "eyeball": (
         eyeball_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/eyeball_sagemaker/",
+        f"{OUTPUT_BASE}/eyeball_sagemaker/run_date={RUN_DATE}/",
     ),
     "unique": (
         unique_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/unique_sagemaker/",
+        f"{OUTPUT_BASE}/unique_sagemaker/run_date={RUN_DATE}/",
     ),
     "merge_survivors": (
         _survivor_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/merge_survivors_sagemaker/",
+        f"{OUTPUT_BASE}/merge_survivors_sagemaker/run_date={RUN_DATE}/",
     ),
     "deduped_input": (
         deduped_input_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/deduped_input_sagemaker/",
+        f"{OUTPUT_BASE}/deduped_input_sagemaker/run_date={RUN_DATE}/",
     ),
     "clusters": (
         _clusters_df,
-        f"{OUTPUT_BASE}/{RUN_DATE}/clusters_sagemaker/",
-    ),
-    "merge_review": (
-        merge_review,
-        f"{OUTPUT_BASE}/{RUN_DATE}/merge_review_sagemaker/",
-    ),
-    "eyeball_review": (
-        eyeball_review,
-        f"{OUTPUT_BASE}/{RUN_DATE}/eyeball_review_sagemaker/",
+        f"{OUTPUT_BASE}/clusters_sagemaker/run_date={RUN_DATE}/",
     ),
 }
 
@@ -1085,6 +1077,14 @@ csv_out = {
     "merge_review": merge_review,
     "eyeball_review": eyeball_review,
 }
+csv_parquet_out = {
+    name: (
+        frame,
+        f"{CSV_OUTPUT_BASE}/{name}_sagemaker/run_date={RUN_DATE}/",
+    )
+    for name, frame in csv_out.items()
+}
+csv_parquet_write_errors = []
 csv_write_errors = []
 
 for name, (frame, path) in OUT.items():
@@ -1105,12 +1105,33 @@ for name, (frame, path) in OUT.items():
         write_errors.append((name, str(e)))
         print(f"{name:16s} -> FAILED: {e}")
 
+for name, (frame, path) in csv_parquet_out.items():
+    if len(frame) == 0:
+        print(f"{name:16s} matching_csv Parquet -> SKIPPED (0 rows)")
+        continue
+
+    try:
+        wr.s3.to_parquet(
+            df=frame,
+            path=path,
+            dataset=True,
+            mode="overwrite",
+            compression="snappy",
+        )
+        print(
+            f"{name:16s} matching_csv Parquet -> "
+            f"{path} ({len(frame):,} rows written)"
+        )
+    except Exception as e:
+        csv_parquet_write_errors.append((name, str(e)))
+        print(f"{name:16s} matching_csv Parquet -> FAILED: {e}")
+
 for name, frame in csv_out.items():
     if len(frame) == 0:
         print(f"{name:16s} CSV -> SKIPPED (0 rows)")
         continue
 
-    csv_path = f"{CSV_OUTPUT_BASE}/{RUN_DATE}/{name}/{name}.csv"
+    csv_path = f"{CSV_OUTPUT_BASE}/{name}/run_date={RUN_DATE}/{name}.csv"
     try:
         wr.s3.to_csv(
             df=frame,
@@ -1130,6 +1151,17 @@ if write_errors:
 else:
     print("\nAll outputs written successfully.")
 
+if csv_parquet_write_errors:
+    print(
+        f"\nWARNING: {len(csv_parquet_write_errors)} matching_csv "
+        f"Parquet S3 write(s) failed:"
+    )
+    for wname, werr in csv_parquet_write_errors:
+        print(f"    {wname}: {werr}")
+    print(f"\nCheck IAM permissions and S3 path: {CSV_OUTPUT_BASE}")
+else:
+    print("All matching_csv Parquet outputs written successfully.")
+
 if csv_write_errors:
     print(f"\nWARNING: {len(csv_write_errors)} CSV S3 write(s) failed:")
     for wname, werr in csv_write_errors:
@@ -1138,25 +1170,53 @@ if csv_write_errors:
 else:
     print("CSV review outputs written successfully.")
 
-CRAWLER_NAME = os.getenv("CDCU_PROCESSED_MATCHING_CRAWLER_NAME", "").strip()
-if CRAWLER_NAME and not write_errors:
-    try:
-        aws_region = (
-            os.getenv("AWS_REGION")
-            or os.getenv("AWS_DEFAULT_REGION")
-            or os.getenv("CDCU_AWS_REGION")
-            or "ap-southeast-1"
+aws_region = (
+    os.getenv("AWS_REGION")
+    or os.getenv("AWS_DEFAULT_REGION")
+    or os.getenv("CDCU_AWS_REGION")
+    or "ap-southeast-1"
+)
+glue_client = boto3.client("glue", region_name=aws_region)
+
+def start_glue_crawler(crawler_name, output_name, output_write_errors):
+    if not crawler_name:
+        print(f"Glue crawler is not configured for {output_name}; skipped.")
+        return
+
+    if output_write_errors:
+        print(
+            f"Skipped Glue crawler start because {output_name} "
+            f"Parquet writes had errors: {crawler_name}"
         )
-        glue_client = boto3.client("glue", region_name=aws_region)
-        glue_client.start_crawler(Name=CRAWLER_NAME)
-        print(f"Started Glue crawler: {CRAWLER_NAME} in {aws_region}")
+        return
+
+    try:
+        glue_client.start_crawler(Name=crawler_name)
+        print(
+            f"Started Glue crawler for {output_name}: "
+            f"{crawler_name} in {aws_region}"
+        )
     except Exception as e:
         if e.__class__.__name__ == "CrawlerRunningException":
-            print(f"Glue crawler already running: {CRAWLER_NAME}")
+            print(f"Glue crawler already running for {output_name}: {crawler_name}")
         else:
-            print(f"WARNING: Failed to start Glue crawler {CRAWLER_NAME}: {e}")
-elif CRAWLER_NAME:
-    print(f"Skipped Glue crawler start because Parquet writes had errors: {CRAWLER_NAME}")
+            print(
+                f"WARNING: Failed to start Glue crawler for "
+                f"{output_name} ({crawler_name}): {e}"
+            )
+
+CRAWLER_NAME = os.getenv("CDCU_PROCESSED_MATCHING_CRAWLER_NAME", "").strip()
+CSV_CRAWLER_NAME = os.getenv(
+    "CDCU_PROCESSED_MATCHING_CSV_CRAWLER_NAME",
+    f"cdcu-{ENVIRONMENT}-processed-matching-csv-crawler",
+).strip()
+
+start_glue_crawler(CRAWLER_NAME, "matching", write_errors)
+start_glue_crawler(
+    CSV_CRAWLER_NAME,
+    "matching_csv",
+    csv_parquet_write_errors,
+)
 
 print(f"\nrun_date = {RUN_DATE}")
 print(f"Final memory: {format_mem_gb()}")

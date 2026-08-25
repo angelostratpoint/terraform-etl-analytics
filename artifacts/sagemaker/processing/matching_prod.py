@@ -1040,17 +1040,17 @@ _survivor_df = survivor_df if "survivor_df" in globals() else pd.DataFrame()
 _clusters_df = clusters_df if "clusters_df" in globals() else pd.DataFrame()
 
 OUT = {
-    "merge": (
+    "merge_pairs": (
         merge_df,
-        f"{OUTPUT_BASE}/merge_sagemaker/run_date={RUN_DATE}/",
+        f"{OUTPUT_BASE}/merge_pairs_sagemaker/run_date={RUN_DATE}/",
     ),
-    "eyeball": (
+    "eyeball_pairs": (
         eyeball_df,
-        f"{OUTPUT_BASE}/eyeball_sagemaker/run_date={RUN_DATE}/",
+        f"{OUTPUT_BASE}/eyeball_pairs_sagemaker/run_date={RUN_DATE}/",
     ),
-    "unique": (
+    "unique_records": (
         unique_df,
-        f"{OUTPUT_BASE}/unique_sagemaker/run_date={RUN_DATE}/",
+        f"{OUTPUT_BASE}/unique_records_sagemaker/run_date={RUN_DATE}/",
     ),
     "merge_survivors": (
         _survivor_df,
@@ -1064,8 +1064,15 @@ OUT = {
         _clusters_df,
         f"{OUTPUT_BASE}/clusters_sagemaker/run_date={RUN_DATE}/",
     ),
+    "merge_review": (
+        merge_review,
+        f"{OUTPUT_BASE}/merge_review_sagemaker/run_date={RUN_DATE}/",
+    ),
+    "eyeball_review": (
+        eyeball_review,
+        f"{OUTPUT_BASE}/eyeball_review_sagemaker/run_date={RUN_DATE}/",
+    ),
 }
-
 write_errors = []
 csv_out = {
     "merge_pairs": merge_df,

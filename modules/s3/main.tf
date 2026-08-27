@@ -153,11 +153,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "cdcu_data_lake" {
 locals {
   # S3 has no real folders; zero-byte objects create visible prefixes in the console.
   folder_prefixes = [
-    "raw/merged/",
+    "raw/customers/",
     "standardized/merged/",
-    "processed/matching/merge/",
-    "processed/matching/unique/",
-    "processed/matching/manual_review/",
+    "processed/matching/merge_pairs_sagemaker/",
+    "processed/matching/eyeball_pairs_sagemaker/",
+    "processed/matching/unique_records_sagemaker/",
+    "processed/matching/merge_survivors_sagemaker/",
+    "processed/matching/deduped_input_sagemaker/",
+    "processed/matching/clusters_sagemaker/",
+    "processed/matching/merge_review_sagemaker/",
+    "processed/matching/eyeball_review_sagemaker/",
+    "processed/matching_csv/merge_pairs_sagemaker/",
+    "processed/matching_csv/eyeball_pairs_sagemaker/",
+    "processed/matching_csv/unique_records_sagemaker/",
+    "processed/matching_csv/merge_survivors_sagemaker/",
+    "processed/matching_csv/deduped_input_sagemaker/",
+    "processed/matching_csv/clusters_sagemaker/",
+    "processed/matching_csv/merge_review_sagemaker/",
+    "processed/matching_csv/eyeball_review_sagemaker/",
     "logs/",
     "errors/",
     # temp/ is required by all Glue jobs as --TempDir

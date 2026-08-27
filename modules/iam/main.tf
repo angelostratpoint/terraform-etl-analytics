@@ -1547,7 +1547,8 @@ resource "aws_iam_group_policy" "de_eventbridge_crawler_trigger" {
         ]
         Resource = [
           "arn:aws:s3:::cdcu-${local.env}-data-lake",
-          "arn:aws:s3:::cdcu-${local.env}-data-lake-apse1"
+          "arn:aws:s3:::cdcu-${local.env}-data-lake-apse1",
+          "arn:aws:s3:::bpims-cdcu-${local.env}-data-lake"
         ]
       }
     ]

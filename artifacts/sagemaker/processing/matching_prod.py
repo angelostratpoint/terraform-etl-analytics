@@ -801,16 +801,93 @@ REVIEW_FIELDS = ["record_id", "surname", "givenname", "dob", "address",
                  "email", "mobileno", "homeno", "officeno", "postal",
                  "event_timestamp"]
 
-# record-level UNIQUE = records never in a MERGE/EYEBALL pair
+# Record-level UNIQUE = records never in a MERGE/EYEBALL pair. The best
+# sub-threshold candidate is retained for review only; it never changes the
+# existing classification or matching thresholds.
 matched_ids = (
     set(merge_df["record_id_left"]) | set(merge_df["record_id_right"])
     | set(eyeball_df["record_id_left"]) | set(eyeball_df["record_id_right"])
 )
-unique_df = df[~df["record_id"].isin(matched_ids)].copy()
+unique_base_columns = [
+    "record_id", "surname", "givenname", "dob", "email", "mobileno",
+    "event_timestamp", "source",
+]
+unique_base_columns = [column for column in unique_base_columns if column in df.columns]
+unique_df = df.loc[~df["record_id"].isin(matched_ids), unique_base_columns].copy()
 unique_df = unique_df.reset_index(drop=True)
 unique_df["classification"] = "UNIQUE"
-unique_df["reason_code"]    = "no_duplicate_found"
 unique_df["run_date"]       = RUN_DATE
+
+best_candidate_columns = [
+    "best_pair_record_id",
+    "best_score",
+    "best_pair_field_scores_json",
+    "best_pair_surname",
+    "best_pair_givenname",
+    "best_pair_dob",
+    "best_pair_email",
+    "best_pair_mobileno",
+]
+for column in best_candidate_columns:
+    unique_df[column] = pd.NA
+
+candidate_unique_pairs = pairs_df[pairs_df["classification"] == "UNIQUE"].copy()
+if not candidate_unique_pairs.empty and not unique_df.empty:
+    left_candidates = candidate_unique_pairs[
+        ["record_id_left", "record_id_right", "match_score", "field_scores_json", "pair_id"]
+    ].rename(columns={
+        "record_id_left": "record_id",
+        "record_id_right": "best_pair_record_id",
+        "match_score": "best_score",
+        "field_scores_json": "best_pair_field_scores_json",
+    })
+    right_candidates = candidate_unique_pairs[
+        ["record_id_right", "record_id_left", "match_score", "field_scores_json", "pair_id"]
+    ].rename(columns={
+        "record_id_right": "record_id",
+        "record_id_left": "best_pair_record_id",
+        "match_score": "best_score",
+        "field_scores_json": "best_pair_field_scores_json",
+    })
+    candidate_matches = pd.concat([left_candidates, right_candidates], ignore_index=True)
+    candidate_matches = candidate_matches[
+        candidate_matches["record_id"].isin(unique_df["record_id"])
+    ]
+    candidate_matches = candidate_matches.sort_values(
+        ["record_id", "best_score", "pair_id", "best_pair_record_id"],
+        ascending=[True, False, True, True],
+    ).drop_duplicates(subset="record_id", keep="first")
+
+    partner_columns = ["record_id", "surname", "givenname", "dob", "email", "mobileno"]
+    partner_lookup = df[[column for column in partner_columns if column in df.columns]].copy()
+    partner_lookup = partner_lookup.rename(columns={
+        "record_id": "best_pair_record_id",
+        "surname": "best_pair_surname",
+        "givenname": "best_pair_givenname",
+        "dob": "best_pair_dob",
+        "email": "best_pair_email",
+        "mobileno": "best_pair_mobileno",
+    })
+    candidate_matches = candidate_matches.merge(
+        partner_lookup,
+        on="best_pair_record_id",
+        how="left",
+    )
+    unique_df = unique_df.merge(
+        candidate_matches.drop(columns="pair_id"),
+        on="record_id",
+        how="left",
+        suffixes=("", "_candidate"),
+    )
+    for column in best_candidate_columns:
+        candidate_column = f"{column}_candidate"
+        if candidate_column in unique_df.columns:
+            unique_df[column] = unique_df[candidate_column].combine_first(unique_df[column])
+            unique_df = unique_df.drop(columns=candidate_column)
+
+unique_df["reason_code"] = unique_df["best_score"].apply(
+    lambda score: f"low_score_best_{score:.0f}" if pd.notna(score) else "never_blocked"
+)
 
 print()
 print("=" * 46)
@@ -972,9 +1049,8 @@ def build_review_output(pairs, source_df):
     if pairs.empty:
         return pd.DataFrame()
 
-    # Prepare left and right lookup tables
-    left_cols  = {f: f"{f}_left"  for f in REVIEW_FIELDS}
-    right_cols = {f: f"{f}_right" for f in REVIEW_FIELDS}
+    left_cols  = {field: f"{field}_left"  for field in REVIEW_FIELDS}
+    right_cols = {field: f"{field}_right" for field in REVIEW_FIELDS}
 
     src = source_df[REVIEW_FIELDS].copy()
 
@@ -1084,14 +1160,6 @@ csv_out = {
     "merge_review": merge_review,
     "eyeball_review": eyeball_review,
 }
-csv_parquet_out = {
-    name: (
-        frame,
-        f"{CSV_OUTPUT_BASE}/{name}_sagemaker/run_date={RUN_DATE}/",
-    )
-    for name, frame in csv_out.items()
-}
-csv_parquet_write_errors = []
 csv_write_errors = []
 
 for name, (frame, path) in OUT.items():
@@ -1100,8 +1168,11 @@ for name, (frame, path) in OUT.items():
         continue
 
     try:
+        # run_date is supplied by the Hive-style S3 partition path. Keeping it
+        # in the Parquet payload makes Glue create it twice in the catalog.
+        catalog_frame = frame.drop(columns=["run_date"], errors="ignore")
         wr.s3.to_parquet(
-            df=frame,
+            df=catalog_frame,
             path=path,
             dataset=True,
             mode="overwrite",
@@ -1112,27 +1183,6 @@ for name, (frame, path) in OUT.items():
         write_errors.append((name, str(e)))
         print(f"{name:16s} -> FAILED: {e}")
 
-for name, (frame, path) in csv_parquet_out.items():
-    if len(frame) == 0:
-        print(f"{name:16s} matching_csv Parquet -> SKIPPED (0 rows)")
-        continue
-
-    try:
-        wr.s3.to_parquet(
-            df=frame,
-            path=path,
-            dataset=True,
-            mode="overwrite",
-            compression="snappy",
-        )
-        print(
-            f"{name:16s} matching_csv Parquet -> "
-            f"{path} ({len(frame):,} rows written)"
-        )
-    except Exception as e:
-        csv_parquet_write_errors.append((name, str(e)))
-        print(f"{name:16s} matching_csv Parquet -> FAILED: {e}")
-
 for name, frame in csv_out.items():
     if len(frame) == 0:
         print(f"{name:16s} CSV -> SKIPPED (0 rows)")
@@ -1140,8 +1190,9 @@ for name, frame in csv_out.items():
 
     csv_path = f"{CSV_OUTPUT_BASE}/{name}/run_date={RUN_DATE}/{name}.csv"
     try:
+        csv_frame = frame.drop(columns=["run_date"], errors="ignore")
         wr.s3.to_csv(
-            df=frame,
+            df=csv_frame,
             path=csv_path,
             index=False,
         )
@@ -1157,17 +1208,6 @@ if write_errors:
     print(f"\nCheck IAM permissions and S3 path: {OUTPUT_BASE}")
 else:
     print("\nAll outputs written successfully.")
-
-if csv_parquet_write_errors:
-    print(
-        f"\nWARNING: {len(csv_parquet_write_errors)} matching_csv "
-        f"Parquet S3 write(s) failed:"
-    )
-    for wname, werr in csv_parquet_write_errors:
-        print(f"    {wname}: {werr}")
-    print(f"\nCheck IAM permissions and S3 path: {CSV_OUTPUT_BASE}")
-else:
-    print("All matching_csv Parquet outputs written successfully.")
 
 if csv_write_errors:
     print(f"\nWARNING: {len(csv_write_errors)} CSV S3 write(s) failed:")
@@ -1213,17 +1253,8 @@ def start_glue_crawler(crawler_name, output_name, output_write_errors):
             )
 
 CRAWLER_NAME = os.getenv("CDCU_PROCESSED_MATCHING_CRAWLER_NAME", "").strip()
-CSV_CRAWLER_NAME = os.getenv(
-    "CDCU_PROCESSED_MATCHING_CSV_CRAWLER_NAME",
-    f"cdcu-{ENVIRONMENT}-processed-matching-csv-crawler",
-).strip()
 
 start_glue_crawler(CRAWLER_NAME, "matching", write_errors)
-start_glue_crawler(
-    CSV_CRAWLER_NAME,
-    "matching_csv",
-    csv_parquet_write_errors,
-)
 
 print(f"\nrun_date = {RUN_DATE}")
 print(f"Final memory: {format_mem_gb()}")

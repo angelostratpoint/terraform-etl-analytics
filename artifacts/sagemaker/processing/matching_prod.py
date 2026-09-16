@@ -690,7 +690,8 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
             "pair_id", "record_id_left", "record_id_right", "match_score",
             "classification", "reason_code", "hard_conflict_flag",
             "conflict_fields", "missing_fields", "event_timestamp_left",
-            "event_timestamp_right", "blocking_rule_ids",
+            "event_timestamp_right", "source_left", "source_right",
+            "blocking_rule_ids",
             "field_scores_json", "run_date",
         ])
 
@@ -733,6 +734,8 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
                     "missing_fields":       res["missing_fields"],
                     "event_timestamp_left": left.get("event_timestamp"),
                     "event_timestamp_right":right.get("event_timestamp"),
+                    "source_left":          left.get("source"),
+                    "source_right":         right.get("source"),
                     "blocking_rule_ids":    pr.blocking_rule_ids,
                     "field_scores_json":    res["field_scores_json"],
                     "run_date":             RUN_DATE,

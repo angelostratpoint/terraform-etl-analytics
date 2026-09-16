@@ -18,6 +18,17 @@ variable "scripts_bucket" {
   type        = string
 }
 
+variable "source_table" {
+  description = "RDS/MySQL table read by the CDCU raw extraction job"
+  type        = string
+  default     = "customers"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.]+$", var.source_table))
+    error_message = "source_table may contain only letters, numbers, underscores, and periods."
+  }
+}
+
 variable "glue_security_group_ids" {
   description = "List of security group IDs for Glue connections"
   type        = list(string)

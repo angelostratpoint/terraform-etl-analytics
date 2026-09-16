@@ -45,6 +45,7 @@ module "s3" {
   kms_key_arn                = local.kms_key_arn
   data_lake_bucket_name      = var.data_lake_bucket_name
   athena_results_bucket_name = var.athena_results_bucket_name
+  source_table               = var.source_table
   tags                       = local.common_tags
 }
 
@@ -68,6 +69,7 @@ module "glue" {
   glue_execution_role_arn       = module.iam.glue_execution_role_arn
   data_lake_bucket              = module.s3.data_lake_bucket_name
   scripts_bucket                = module.s3.data_lake_bucket_name
+  source_table                  = var.source_table
   glue_security_group_ids       = [var.existing_security_group_id]
   subnet_id                     = var.subnet_id
   availability_zone             = var.availability_zone

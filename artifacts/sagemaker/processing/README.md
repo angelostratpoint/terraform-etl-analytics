@@ -9,6 +9,11 @@
 `matching_prod.py` is generated from the DE-provided `Matching_prod.ipynb`
 notebook and is the default SageMaker Pipeline processing entry point.
 
+For CR2, the `unique_records_sagemaker` output includes the best sub-threshold
+candidate, when one exists, with its score, field-score JSON, and selected
+partner values. It does not change the matching score, threshold, blocking, or
+classification rules.
+
 `merged_matching.py` remains as the earlier sandbox placeholder and should not
 be treated as the final UAT/PROD matching implementation.
 

@@ -94,6 +94,12 @@ variable "glue_worker_type" {
   default     = "G.1X"
 }
 
+variable "source_table" {
+  description = "RDS/MySQL source table for CDCU Glue ingestion"
+  type        = string
+  default     = "customers"
+}
+
 variable "merged_jdbc_url" {
   description = "Merged BPI-MS MySQL JDBC URL used by the CDCU Glue source connection."
   type        = string

@@ -28,6 +28,7 @@ athena_results_bucket_name = "cdcu-uat-athena-results"
 
 glue_worker_count = 2
 glue_worker_type  = "G.1X"
+source_table      = "customers"
 
 # BPI-MS merged source DB used by the single CDCU Glue JDBC connection.
 # Replace this placeholder with the approved UAT MySQL RDS endpoint and DB

@@ -27,6 +27,12 @@ variable "athena_results_bucket_name" {
   default     = ""
 }
 
+variable "source_table" {
+  description = "RDS/MySQL source table used for raw-layer prefix placeholders"
+  type        = string
+  default     = "customers"
+}
+
 variable "tags" {
   description = "Common resource tags"
   type        = map(string)

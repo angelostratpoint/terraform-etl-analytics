@@ -61,10 +61,10 @@ resource "aws_glue_job" "merged_raw_extraction" {
     "--conf"                             = "spark.eventLog.rolling.enabled=true --conf spark.sql.catalog.glue_catalog.glue.skip-name-validation=true"
     "--TempDir"                          = "s3://${var.data_lake_bucket}/temp/"
     "--SOURCE_CONNECTION"                = aws_glue_connection.merged_mysql.name
-    "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/customers/"
+    "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/${var.source_table}/"
     "--ENVIRONMENT"                      = var.environment
     "--SECRET_NAME"                      = var.merged_mysql_secret_name
-    "--SOURCE_TABLE"                     = "customers"
+    "--SOURCE_TABLE"                     = var.source_table
     "--MIN_EXPECTED_ROWS"                = "1000"
     "--COALESCE_FILES"                   = tostring(var.environment == "sit" ? 1 : 4)
   }
@@ -103,9 +103,9 @@ resource "aws_glue_job" "merged_standardization" {
     "--enable-spark-ui"                  = "true"
     "--conf"                             = "spark.eventLog.rolling.enabled=true --conf spark.sql.catalog.glue_catalog.glue.skip-name-validation=true"
     "--TempDir"                          = "s3://${var.data_lake_bucket}/temp/"
-    "--SOURCE_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/customers/"
+    "--SOURCE_S3_PATH"                   = "s3://${var.data_lake_bucket}/raw/${var.source_table}/"
     "--TARGET_S3_PATH"                   = "s3://${var.data_lake_bucket}/standardized/merged/"
-    "--INPUT_PATH"                       = "s3://${var.data_lake_bucket}/raw/customers/"
+    "--INPUT_PATH"                       = "s3://${var.data_lake_bucket}/raw/${var.source_table}/"
     "--OUTPUT_PATH"                      = "s3://${var.data_lake_bucket}/standardized/merged/"
     "--ENVIRONMENT"                      = var.environment
     "--MIN_EXPECTED_ROWS"                = "1000"
@@ -131,7 +131,7 @@ resource "aws_glue_crawler" "merged_raw" {
   database_name = aws_glue_catalog_database.cdcu.name
 
   s3_target {
-    path = "s3://${var.data_lake_bucket}/raw/customers/"
+    path = "s3://${var.data_lake_bucket}/raw/${var.source_table}/"
   }
 
   schema_change_policy {
@@ -177,14 +177,51 @@ resource "aws_glue_crawler" "processed_matching" {
   role          = var.glue_execution_role_arn
   database_name = aws_glue_catalog_database.cdcu.name
 
+  # Each matching output is a separate table root. Crawling the common parent
+  # lets legacy layouts and incompatible schemas produce generated tables.
   s3_target {
-    path = "s3://${var.data_lake_bucket}/processed/matching/"
+    path = "s3://${var.data_lake_bucket}/processed/matching/clusters_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/deduped_input_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/eyeball_pairs_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/eyeball_review_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/merge_pairs_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/merge_review_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/merge_survivors_sagemaker/"
+  }
+
+  s3_target {
+    path = "s3://${var.data_lake_bucket}/processed/matching/unique_records_sagemaker/"
   }
 
   schema_change_policy {
     update_behavior = "UPDATE_IN_DATABASE"
     delete_behavior = "LOG"
   }
+
+  configuration = jsonencode({
+    Version = 1.0
+    CrawlerOutput = {
+      Partitions = { AddOrUpdateBehavior = "InheritFromTable" }
+    }
+  })
 
   tags = merge(var.tags, {
     Name = "cdcu-${var.environment}-processed-matching-crawler"

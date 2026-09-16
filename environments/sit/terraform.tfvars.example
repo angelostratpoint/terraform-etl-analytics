@@ -28,6 +28,7 @@ athena_results_bucket_name = "bpims-cdcu-sit-athena-results"
 
 glue_worker_count = 2
 glue_worker_type  = "G.1X"
+source_table      = "customers"
 
 # BPI-MS merged source DB used by the single CDCU Glue JDBC connection.
 merged_jdbc_url              = "jdbc:mysql://merged-rds-endpoint.example.com:3306/cdcu_db?useSSL=false&allowPublicKeyRetrieval=true"

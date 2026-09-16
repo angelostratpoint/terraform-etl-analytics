@@ -736,6 +736,9 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
                     "event_timestamp_right":right.get("event_timestamp"),
                     "source_left":          left.get("source"),
                     "source_right":         right.get("source"),
+                    # CR1: enable these passthrough fields after approval.
+                    # "contract_type_left": left.get("contract_type"),
+                    # "contract_type_right": right.get("contract_type"),
                     "blocking_rule_ids":    pr.blocking_rule_ids,
                     "field_scores_json":    res["field_scores_json"],
                     "run_date":             RUN_DATE,

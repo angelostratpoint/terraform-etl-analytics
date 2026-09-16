@@ -691,6 +691,7 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
             "classification", "reason_code", "hard_conflict_flag",
             "conflict_fields", "missing_fields", "event_timestamp_left",
             "event_timestamp_right", "source_left", "source_right",
+            # CR1: add "contract_type_left", "contract_type_right" after approval.
             "blocking_rule_ids",
             "field_scores_json", "run_date",
         ])
@@ -817,6 +818,7 @@ matched_ids = (
 unique_base_columns = [
     "record_id", "surname", "givenname", "dob", "email", "mobileno",
     "event_timestamp", "source",
+    # CR1: add "contract_type" after approval.
 ]
 unique_base_columns = [column for column in unique_base_columns if column in df.columns]
 unique_df = df.loc[~df["record_id"].isin(matched_ids), unique_base_columns].copy()

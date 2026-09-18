@@ -691,7 +691,7 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
             "classification", "reason_code", "hard_conflict_flag",
             "conflict_fields", "missing_fields", "event_timestamp_left",
             "event_timestamp_right", "source_left", "source_right",
-            # CR1: add "contract_type_left", "contract_type_right" after approval.
+            "contract_type_left", "contract_type_right",
             "blocking_rule_ids",
             "field_scores_json", "run_date",
         ])
@@ -737,9 +737,8 @@ def score_all_pairs(frame, cand, chunk_size=CHUNK_SIZE):
                     "event_timestamp_right":right.get("event_timestamp"),
                     "source_left":          left.get("source"),
                     "source_right":         right.get("source"),
-                    # CR1: enable these passthrough fields after approval.
-                    # "contract_type_left": left.get("contract_type"),
-                    # "contract_type_right": right.get("contract_type"),
+                    "contract_type_left":   left.get("contract_type"),
+                    "contract_type_right":  right.get("contract_type"),
                     "blocking_rule_ids":    pr.blocking_rule_ids,
                     "field_scores_json":    res["field_scores_json"],
                     "run_date":             RUN_DATE,
@@ -817,8 +816,7 @@ matched_ids = (
 )
 unique_base_columns = [
     "record_id", "surname", "givenname", "dob", "email", "mobileno",
-    "event_timestamp", "source",
-    # CR1: add "contract_type" after approval.
+    "event_timestamp", "source", "contract_type",
 ]
 unique_base_columns = [column for column in unique_base_columns if column in df.columns]
 unique_df = df.loc[~df["record_id"].isin(matched_ids), unique_base_columns].copy()

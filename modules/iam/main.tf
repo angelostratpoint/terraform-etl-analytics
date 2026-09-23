@@ -867,6 +867,23 @@ resource "aws_iam_policy" "athena_access" {
         Resource = var.athena_results_bucket_arn
       },
       {
+        Sid    = "AthenaDataLakeRead"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "${var.data_lake_bucket_arn}/*"
+      },
+      {
+        Sid    = "AthenaDataLakeListAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
+        Resource = var.data_lake_bucket_arn
+      },
+      {
         Sid    = "AthenaGlueCatalogAccess"
         Effect = "Allow"
         Action = [

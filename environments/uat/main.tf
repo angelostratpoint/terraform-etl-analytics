@@ -90,12 +90,14 @@ module "glue" {
 module "athena" {
   source = "../../modules/athena"
 
-  environment           = local.environment
-  athena_results_bucket = module.s3.athena_results_bucket_name
-  glue_catalog_database = module.glue.catalog_database_name
-  enable_kms            = var.enable_kms
-  kms_key_arn           = local.kms_key_arn
-  tags                  = local.common_tags
+  environment                     = local.environment
+  athena_results_bucket           = module.s3.athena_results_bucket_name
+  glue_catalog_database           = module.glue.catalog_database_name
+  enable_quicksight_setup_queries = true
+  quicksight_data_lake_bucket     = module.s3.data_lake_bucket_name
+  enable_kms                      = var.enable_kms
+  kms_key_arn                     = local.kms_key_arn
+  tags                            = local.common_tags
 }
 
 module "sagemaker_processing_image" {

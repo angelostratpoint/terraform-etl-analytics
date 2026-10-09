@@ -1,0 +1,10 @@
+CREATE OR REPLACE VIEW vw_field_score_unpivoted AS
+SELECT run_date, classification_label, 'Surname' AS field_name, avg_surname AS avg_score FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Given Name', avg_givenname FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'DOB', avg_dob FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Address', avg_address FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Email', avg_email FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Mobile', avg_mobileno FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Postal Code', avg_postal FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Home No', avg_homeno FROM vw_field_score_analysis
+UNION ALL SELECT run_date, classification_label, 'Office No', avg_officeno FROM vw_field_score_analysis;

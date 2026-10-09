@@ -1,0 +1,41 @@
+CREATE OR REPLACE VIEW vw_dq_issue_detail AS
+SELECT run_date, source, field_name, empty_count, total_records,
+    ROUND(empty_count * 100.0 / NULLIF(total_records, 0), 2) AS empty_rate_pct
+FROM (
+    SELECT run_date, source, 'Surname' AS field_name,
+        SUM(CASE WHEN surname IS NULL OR TRIM(surname)='' THEN 1 ELSE 0 END) AS empty_count,
+        COUNT(*) AS total_records
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Given Name',
+        SUM(CASE WHEN givenname IS NULL OR TRIM(givenname)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Date of Birth',
+        SUM(CASE WHEN dob IS NULL OR TRIM(dob)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Address',
+        SUM(CASE WHEN address IS NULL OR TRIM(address)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Email',
+        SUM(CASE WHEN email IS NULL OR TRIM(email)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Mobile No',
+        SUM(CASE WHEN mobileno IS NULL OR TRIM(mobileno)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Postal Code',
+        SUM(CASE WHEN postal IS NULL OR TRIM(postal)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Home No',
+        SUM(CASE WHEN homeno IS NULL OR TRIM(homeno)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+    UNION ALL
+    SELECT run_date, source, 'Office No',
+        SUM(CASE WHEN officeno IS NULL OR TRIM(officeno)='' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date, source
+) field_stats;

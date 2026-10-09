@@ -13,6 +13,11 @@ output "athena_workgroup_name" {
   value       = module.athena.workgroup_name
 }
 
+output "quicksight_setup_queries" {
+  description = "Ordered manual QuickSight Athena setup steps for Sir Archie/approved UAT operators"
+  value       = module.athena.quicksight_setup_queries
+}
+
 output "glue_catalog_database" {
   description = "Glue Data Catalog database name"
   value       = module.glue.catalog_database_name

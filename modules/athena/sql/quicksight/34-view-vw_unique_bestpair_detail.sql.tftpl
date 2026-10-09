@@ -1,0 +1,31 @@
+CREATE OR REPLACE VIEW vw_unique_bestpair_detail AS
+WITH scored AS (
+    SELECT run_date, record_id, best_pair_record_id, best_score,
+        contract_type, source, reason_code, best_pair_field_scores_json,
+        COUNT(*) OVER (
+            PARTITION BY run_date,
+                         LEAST(record_id, best_pair_record_id),
+                         GREATEST(record_id, best_pair_record_id)
+        ) AS directions,
+        ROW_NUMBER() OVER (
+            PARTITION BY run_date,
+                         LEAST(record_id, best_pair_record_id),
+                         GREATEST(record_id, best_pair_record_id)
+            ORDER BY best_score DESC, record_id
+        ) AS pair_rank
+    FROM unique_records_sagemaker
+    WHERE best_score IS NOT NULL
+      AND best_pair_record_id IS NOT NULL
+      AND record_id <> best_pair_record_id
+)
+SELECT run_date, record_id, best_pair_record_id, best_score,
+    contract_type, source, reason_code,
+    CASE WHEN directions >= 2 THEN 'Yes' ELSE 'No' END AS mutual_best_pair,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.surname')   AS DOUBLE) AS bp_surname,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.givenname') AS DOUBLE) AS bp_givenname,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.dob')       AS DOUBLE) AS bp_dob,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.email')     AS DOUBLE) AS bp_email,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.mobileno')  AS DOUBLE) AS bp_mobileno,
+    CAST(JSON_EXTRACT_SCALAR(best_pair_field_scores_json, '$.address')   AS DOUBLE) AS bp_address
+FROM scored
+WHERE pair_rank = 1;

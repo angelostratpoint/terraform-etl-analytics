@@ -1,0 +1,44 @@
+CREATE OR REPLACE VIEW vw_ingestion_summary AS
+WITH
+runs AS (
+    SELECT DISTINCT run_date FROM deduped_input_sagemaker
+),
+extractions AS (
+    -- extraction_date may be stored as 'YYYY-MM-DD' or 'YYYYMMDD'; normalise it for comparison
+    SELECT DISTINCT
+        CAST(extraction_date AS VARCHAR) AS extraction_key,
+        CASE WHEN LENGTH(CAST(extraction_date AS VARCHAR)) = 8
+             THEN SUBSTR(CAST(extraction_date AS VARCHAR), 1, 4) || '-' ||
+                  SUBSTR(CAST(extraction_date AS VARCHAR), 5, 2) || '-' ||
+                  SUBSTR(CAST(extraction_date AS VARCHAR), 7, 2)
+             ELSE CAST(extraction_date AS VARCHAR) END AS extraction_day
+    FROM merged
+),
+run_extraction AS (
+    -- the run reads the latest extraction available on its run_date
+    SELECT r.run_date,
+           MAX(e.extraction_day)                    AS extraction_date,
+           MAX_BY(e.extraction_key, e.extraction_day) AS extraction_key
+    FROM runs r
+    JOIN extractions e ON e.extraction_day <= r.run_date
+    GROUP BY r.run_date
+),
+ingested AS (
+    SELECT re.run_date, re.extraction_date, m.source, COUNT(*) AS ingested_records
+    FROM run_extraction re
+    JOIN merged m ON CAST(m.extraction_date AS VARCHAR) = re.extraction_key
+    GROUP BY re.run_date, re.extraction_date, m.source
+),
+processed AS (
+    SELECT run_date, source, COUNT(*) AS processed_records
+    FROM deduped_input_sagemaker
+    GROUP BY run_date, source
+)
+SELECT i.run_date,
+       i.extraction_date,
+       i.source,
+       i.ingested_records,
+       COALESCE(p.processed_records, 0)                      AS processed_records,
+       i.ingested_records - COALESCE(p.processed_records, 0) AS same_client_removed
+FROM ingested i
+LEFT JOIN processed p ON p.run_date = i.run_date AND p.source = i.source;

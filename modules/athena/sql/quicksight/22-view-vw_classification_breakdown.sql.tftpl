@@ -1,0 +1,32 @@
+CREATE OR REPLACE VIEW vw_classification_breakdown AS
+SELECT r.run_date, 'Merged' AS classification, r.record_count, p.pair_count
+FROM (
+    SELECT run_date, COUNT(DISTINCT record_id) AS record_count
+    FROM (
+        SELECT run_date, record_id_left AS record_id FROM merge_pairs_sagemaker
+        UNION ALL
+        SELECT run_date, record_id_right FROM merge_pairs_sagemaker
+    ) t
+    GROUP BY run_date
+) r
+JOIN (
+    SELECT run_date, COUNT(*) AS pair_count FROM merge_pairs_sagemaker GROUP BY run_date
+) p ON r.run_date = p.run_date
+UNION ALL
+SELECT r.run_date, 'Manual Review', r.record_count, p.pair_count
+FROM (
+    SELECT run_date, COUNT(DISTINCT record_id) AS record_count
+    FROM (
+        SELECT run_date, record_id_left AS record_id FROM eyeball_pairs_sagemaker
+        UNION ALL
+        SELECT run_date, record_id_right FROM eyeball_pairs_sagemaker
+    ) t
+    GROUP BY run_date
+) r
+JOIN (
+    SELECT run_date, COUNT(*) AS pair_count FROM eyeball_pairs_sagemaker GROUP BY run_date
+) p ON r.run_date = p.run_date
+UNION ALL
+SELECT run_date, 'Unique', COUNT(*), CAST(NULL AS BIGINT)
+FROM unique_records_sagemaker
+GROUP BY run_date;

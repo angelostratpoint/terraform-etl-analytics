@@ -1,0 +1,9 @@
+ALTER TABLE merge_survivors_sagemaker SET TBLPROPERTIES (
+  'projection.enabled'                = 'true',
+  'projection.run_date.type'          = 'date',
+  'projection.run_date.range'         = '2026-01-01,NOW+1DAYS',
+  'projection.run_date.format'        = 'yyyy-MM-dd',
+  'projection.run_date.interval'      = '1',
+  'projection.run_date.interval.unit' = 'DAYS',
+  'storage.location.template'         = 's3://${data_lake_bucket}/processed/matching/merge_survivors_sagemaker/run_date=$${run_date}/'
+);

@@ -1,0 +1,43 @@
+CREATE OR REPLACE VIEW vw_source_comparison AS
+WITH
+all_records AS (
+    SELECT record_id, source, run_date FROM deduped_input_sagemaker
+),
+record_classification AS (
+    SELECT record_id, 'Merged' AS classification, run_date FROM (
+        SELECT record_id_left AS record_id, run_date FROM merge_pairs_sagemaker
+        UNION ALL SELECT record_id_right, run_date FROM merge_pairs_sagemaker
+    ) t GROUP BY record_id, run_date
+    UNION ALL
+    SELECT record_id, 'Manual Review', run_date FROM (
+        SELECT record_id_left AS record_id, run_date FROM eyeball_pairs_sagemaker
+        UNION ALL SELECT record_id_right, run_date FROM eyeball_pairs_sagemaker
+    ) t GROUP BY record_id, run_date
+    UNION ALL
+    SELECT record_id, 'Unique', run_date FROM unique_records_sagemaker
+),
+source_stats AS (
+    SELECT ar.run_date, ar.source,
+        COUNT(DISTINCT ar.record_id) AS total_records,
+        ROUND(COUNT(DISTINCT CASE
+            WHEN (di.surname  IS NULL OR TRIM(di.surname)  = '')
+              OR (di.dob      IS NULL OR TRIM(di.dob)      = '')
+              OR (di.email    IS NULL OR TRIM(di.email)    = '')
+              OR (di.mobileno IS NULL OR TRIM(di.mobileno) = '')
+            THEN ar.record_id END) * 100.0
+            / NULLIF(COUNT(DISTINCT ar.record_id), 0), 2) AS dq_issue_rate_pct,
+        ROUND(COUNT(DISTINCT CASE WHEN rc.classification = 'Manual Review' THEN ar.record_id END)
+            * 100.0 / NULLIF(COUNT(DISTINCT ar.record_id), 0), 2) AS manual_review_rate_pct,
+        ROUND(COUNT(DISTINCT CASE WHEN rc.classification = 'Merged' THEN ar.record_id END)
+            * 100.0 / NULLIF(COUNT(DISTINCT ar.record_id), 0), 2) AS merged_rate_pct
+    FROM all_records ar
+    LEFT JOIN record_classification rc ON ar.record_id = rc.record_id AND ar.run_date = rc.run_date
+    LEFT JOIN deduped_input_sagemaker di ON ar.record_id = di.record_id AND ar.run_date = di.run_date
+    GROUP BY ar.run_date, ar.source
+)
+SELECT s.run_date, s.source,
+       s.total_records, s.dq_issue_rate_pct, s.manual_review_rate_pct, s.merged_rate_pct,
+       i.ingested_records,
+       i.same_client_removed
+FROM source_stats s
+LEFT JOIN vw_ingestion_summary i ON i.run_date = s.run_date AND i.source = s.source;

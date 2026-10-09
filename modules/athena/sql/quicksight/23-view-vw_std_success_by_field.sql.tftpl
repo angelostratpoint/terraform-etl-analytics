@@ -1,0 +1,41 @@
+CREATE OR REPLACE VIEW vw_std_success_by_field AS
+SELECT run_date, field_name, populated_count, total_records,
+    ROUND(populated_count * 100.0 / NULLIF(total_records, 0), 2) AS success_rate_pct
+FROM (
+    SELECT run_date, 'Surname' AS field_name,
+        SUM(CASE WHEN surname IS NOT NULL AND TRIM(surname) != '' THEN 1 ELSE 0 END) AS populated_count,
+        COUNT(*) AS total_records
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Given Name',
+        SUM(CASE WHEN givenname IS NOT NULL AND TRIM(givenname) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Date of Birth',
+        SUM(CASE WHEN dob IS NOT NULL AND TRIM(dob) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Address',
+        SUM(CASE WHEN address IS NOT NULL AND TRIM(address) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Email',
+        SUM(CASE WHEN email IS NOT NULL AND TRIM(email) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Mobile No',
+        SUM(CASE WHEN mobileno IS NOT NULL AND TRIM(mobileno) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Postal Code',
+        SUM(CASE WHEN postal IS NOT NULL AND TRIM(postal) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Home No',
+        SUM(CASE WHEN homeno IS NOT NULL AND TRIM(homeno) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+    UNION ALL
+    SELECT run_date, 'Office No',
+        SUM(CASE WHEN officeno IS NOT NULL AND TRIM(officeno) != '' THEN 1 ELSE 0 END), COUNT(*)
+    FROM deduped_input_sagemaker GROUP BY run_date
+) field_stats;

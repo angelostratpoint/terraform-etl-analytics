@@ -1,0 +1,18 @@
+CREATE OR REPLACE VIEW vw_unique_bestpair_summary AS
+SELECT run_date,
+    COUNT(*) AS unique_records_evaluated,
+    SUM(CASE WHEN best_score IS NOT NULL
+              AND best_pair_record_id IS NOT NULL
+              AND record_id <> best_pair_record_id THEN 1 ELSE 0 END) AS records_with_best_pair,
+    COUNT(DISTINCT CASE WHEN best_score IS NOT NULL
+                         AND best_pair_record_id IS NOT NULL
+                         AND record_id <> best_pair_record_id
+                        THEN LEAST(record_id, best_pair_record_id) || '|' || GREATEST(record_id, best_pair_record_id)
+                   END) AS best_pairs_retained,
+    ROUND(AVG(CASE WHEN best_score IS NOT NULL
+                    AND best_pair_record_id IS NOT NULL
+                    AND record_id <> best_pair_record_id THEN best_score END), 1) AS avg_best_pair_score,
+    SUM(CASE WHEN reason_code = 'never_blocked'  THEN 1 ELSE 0 END) AS never_blocked_count,
+    SUM(CASE WHEN reason_code <> 'never_blocked' THEN 1 ELSE 0 END) AS low_score_count
+FROM unique_records_sagemaker
+GROUP BY run_date;

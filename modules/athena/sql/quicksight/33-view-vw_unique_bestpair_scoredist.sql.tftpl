@@ -1,0 +1,19 @@
+CREATE OR REPLACE VIEW vw_unique_bestpair_scoredist AS
+SELECT run_date,
+    CASE
+        WHEN best_score >= 90 THEN '90-100'
+        WHEN best_score >= 80 THEN '80-89'
+        WHEN best_score >= 70 THEN '70-79'
+        WHEN best_score IS NOT NULL THEN 'Below 70'
+        ELSE 'No Pair'
+    END AS score_band,
+    COUNT(*) AS record_count
+FROM unique_records_sagemaker
+GROUP BY run_date,
+    CASE
+        WHEN best_score >= 90 THEN '90-100'
+        WHEN best_score >= 80 THEN '80-89'
+        WHEN best_score >= 70 THEN '70-79'
+        WHEN best_score IS NOT NULL THEN 'Below 70'
+        ELSE 'No Pair'
+    END;

@@ -1,0 +1,9 @@
+ALTER TABLE merged SET TBLPROPERTIES (
+  'projection.enabled'                     = 'true',
+  'projection.extraction_date.type'        = 'date',
+  'projection.extraction_date.format'      = 'yyyy-MM-dd',
+  'projection.extraction_date.range'       = '2026-01-01,NOW+1DAYS',
+  'projection.extraction_date.interval'    = '1',
+  'projection.extraction_date.interval.unit' = 'DAYS',
+  'storage.location.template'              = 's3://${data_lake_bucket}/standardized/merged/extraction_date=$${extraction_date}/'
+);

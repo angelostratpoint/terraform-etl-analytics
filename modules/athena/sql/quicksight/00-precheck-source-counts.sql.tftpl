@@ -1,0 +1,36 @@
+SELECT 'merged' AS table_name, CAST(extraction_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM merged
+GROUP BY extraction_date
+UNION ALL
+SELECT 'merge_pairs_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM merge_pairs_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'eyeball_pairs_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM eyeball_pairs_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'unique_records_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM unique_records_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'deduped_input_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM deduped_input_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'clusters_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM clusters_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'merge_survivors_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM merge_survivors_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'merge_review_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM merge_review_sagemaker
+GROUP BY run_date
+UNION ALL
+SELECT 'eyeball_review_sagemaker' AS table_name, CAST(run_date AS VARCHAR) AS partition_date, COUNT(*) AS row_count
+FROM eyeball_review_sagemaker
+GROUP BY run_date
+ORDER BY table_name, partition_date;

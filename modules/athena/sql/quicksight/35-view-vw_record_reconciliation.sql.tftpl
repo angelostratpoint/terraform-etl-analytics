@@ -1,0 +1,45 @@
+CREATE OR REPLACE VIEW vw_record_reconciliation AS
+WITH
+ing AS (
+    SELECT run_date,
+           MAX(extraction_date)     AS extraction_date,
+           SUM(ingested_records)    AS ingested_records,
+           SUM(same_client_removed) AS same_client_removed
+    FROM vw_ingestion_summary
+    GROUP BY run_date
+),
+b AS (
+    SELECT e.run_date, i.extraction_date, i.ingested_records, i.same_client_removed,
+           e.total_records, e.merged_records, e.manual_review_records, e.unique_records,
+           e.total_records_with_overlap, e.overlap_records,
+           e.merged_rate_pct, e.manual_review_rate_pct, e.unique_rate_pct,
+           e.merge_pair_count, e.eyeball_pair_count, e.total_pair_count
+    FROM vw_exec_summary e
+    LEFT JOIN ing i ON i.run_date = e.run_date
+)
+SELECT run_date, 1 AS line_no, 'Total ingested' AS line_item, ingested_records AS record_count,
+       CAST(CASE WHEN ingested_records IS NOT NULL THEN 100.0 END AS DOUBLE) AS pct_of_ingested,
+       CAST(NULL AS DOUBLE) AS pct_of_processed, CAST(NULL AS BIGINT) AS pair_count, 'input' AS line_type,
+       'All rows received from Legacy and Microsite in the extraction used for this run (' || COALESCE(extraction_date, 'not found') || ')' AS business_meaning
+FROM b
+UNION ALL SELECT run_date, 2, '− Same client ID removed', same_client_removed,
+       ROUND(same_client_removed * 100.0 / NULLIF(ingested_records, 0), 2), NULL, NULL, 'adjustment',
+       'One customer with several policies counts once; the most complete row is kept' FROM b
+UNION ALL SELECT run_date, 3, 'Records processed', total_records,
+       ROUND(total_records * 100.0 / NULLIF(ingested_records, 0), 2), 100.0, NULL, 'subtotal',
+       'One row per client. This is the population that was matched' FROM b
+UNION ALL SELECT run_date, 4, 'Merged', merged_records, NULL, merged_rate_pct, merge_pair_count, 'component',
+       'High-confidence duplicate. Auto-merge candidate.' FROM b
+UNION ALL SELECT run_date, 5, 'Manual Review', manual_review_records, NULL, manual_review_rate_pct, eyeball_pair_count, 'component',
+       'Ambiguous or conflicting. Needs human review.' FROM b
+UNION ALL SELECT run_date, 6, 'Unique', unique_records, NULL, unique_rate_pct, NULL, 'component',
+       'No duplicate found. No action required.' FROM b
+UNION ALL SELECT run_date, 7, 'Sum of classifications', total_records_with_overlap, NULL,
+       ROUND(total_records_with_overlap * 100.0 / NULLIF(total_records, 0), 2), total_pair_count, 'subtotal',
+       'Merged + Manual Review + Unique' FROM b
+UNION ALL SELECT run_date, 8, '− Counted in both Merged and Manual Review', overlap_records, NULL,
+       ROUND(overlap_records * 100.0 / NULLIF(total_records, 0), 2), NULL, 'adjustment',
+       'A confident match to one client and an uncertain match to another; counted once in Records processed' FROM b
+UNION ALL SELECT run_date, 9, 'Check: equals Records processed', total_records_with_overlap - overlap_records, NULL, NULL, NULL, 'check',
+       CASE WHEN total_records_with_overlap - overlap_records = total_records
+            THEN 'Reconciled' ELSE 'Does not reconcile — investigate' END FROM b;

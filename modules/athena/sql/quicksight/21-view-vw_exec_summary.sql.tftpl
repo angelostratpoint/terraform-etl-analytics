@@ -1,0 +1,69 @@
+CREATE OR REPLACE VIEW vw_exec_summary AS
+WITH
+run_dates AS (
+    SELECT run_date FROM unique_records_sagemaker
+    UNION
+    SELECT run_date FROM merge_pairs_sagemaker
+    UNION
+    SELECT run_date FROM eyeball_pairs_sagemaker
+),
+merge_ids AS (
+    SELECT run_date, record_id_left AS record_id FROM merge_pairs_sagemaker
+    UNION
+    SELECT run_date, record_id_right FROM merge_pairs_sagemaker
+),
+eyeball_ids AS (
+    SELECT run_date, record_id_left AS record_id FROM eyeball_pairs_sagemaker
+    UNION
+    SELECT run_date, record_id_right FROM eyeball_pairs_sagemaker
+),
+merge_records AS (
+    SELECT run_date, COUNT(*) AS merged_records FROM merge_ids GROUP BY run_date
+),
+eyeball_records AS (
+    SELECT run_date, COUNT(*) AS manual_review_records FROM eyeball_ids GROUP BY run_date
+),
+overlap_records AS (
+    SELECT m.run_date, COUNT(*) AS overlap_count
+    FROM merge_ids m
+    JOIN eyeball_ids e
+      ON m.record_id = e.record_id
+     AND m.run_date  = e.run_date
+    GROUP BY m.run_date
+),
+unique_recs AS (
+    SELECT run_date, COUNT(*) AS unique_records
+    FROM unique_records_sagemaker GROUP BY run_date
+),
+pair_counts AS (
+    SELECT run_date,
+        SUM(CASE WHEN classification_label = 'Merged'        THEN 1 ELSE 0 END) AS merge_pairs,
+        SUM(CASE WHEN classification_label = 'Manual Review' THEN 1 ELSE 0 END) AS eyeball_pairs,
+        COUNT(*) AS total_pairs
+    FROM vw_all_pairs GROUP BY run_date
+),
+base AS (
+    SELECT r.run_date,
+        COALESCE(m.merged_records, 0)        AS merged_records,
+        COALESCE(e.manual_review_records, 0) AS manual_review_records,
+        COALESCE(o.overlap_count, 0)         AS overlap_records,
+        COALESCE(u.unique_records, 0)        AS unique_records,
+        COALESCE(pc.merge_pairs, 0)          AS merge_pair_count,
+        COALESCE(pc.eyeball_pairs, 0)        AS eyeball_pair_count,
+        COALESCE(pc.total_pairs, 0)          AS total_pair_count
+    FROM run_dates r
+    LEFT JOIN merge_records   m  ON r.run_date = m.run_date
+    LEFT JOIN eyeball_records e  ON r.run_date = e.run_date
+    LEFT JOIN overlap_records o  ON r.run_date = o.run_date
+    LEFT JOIN unique_recs     u  ON r.run_date = u.run_date
+    LEFT JOIN pair_counts     pc ON r.run_date = pc.run_date
+)
+SELECT run_date,
+    merged_records + manual_review_records - overlap_records + unique_records AS total_records,
+    merged_records + manual_review_records + unique_records                   AS total_records_with_overlap,
+    overlap_records, merged_records, manual_review_records, unique_records,
+    merge_pair_count, eyeball_pair_count, total_pair_count,
+    ROUND(merged_records        * 100.0 / NULLIF(merged_records + manual_review_records - overlap_records + unique_records, 0), 2) AS merged_rate_pct,
+    ROUND(manual_review_records * 100.0 / NULLIF(merged_records + manual_review_records - overlap_records + unique_records, 0), 2) AS manual_review_rate_pct,
+    ROUND(unique_records        * 100.0 / NULLIF(merged_records + manual_review_records - overlap_records + unique_records, 0), 2) AS unique_rate_pct
+FROM base;

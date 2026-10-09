@@ -30,3 +30,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_quicksight_setup_queries" {
+  description = "Create ordered manual Athena saved queries for QuickSight projection, views, and validation. Does not execute SQL."
+  type        = bool
+  default     = false
+}
+
+variable "quicksight_data_lake_bucket" {
+  description = "Actual data lake bucket used in QuickSight partition projection saved queries"
+  type        = string
+  default     = ""
+}

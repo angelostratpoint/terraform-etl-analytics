@@ -1,0 +1,77 @@
+CREATE OR REPLACE VIEW vw_all_pairs AS
+SELECT
+    pair_id, record_id_left, record_id_right,
+    match_score, classification, reason_code,
+    hard_conflict_flag, conflict_fields, missing_fields, blocking_rule_ids,
+    source_left, source_right,
+    contract_type_left, contract_type_right,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.surname')   AS DOUBLE) AS surname_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.givenname') AS DOUBLE) AS givenname_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.dob')       AS DOUBLE) AS dob_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.address')   AS DOUBLE) AS address_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.email')     AS DOUBLE) AS email_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.mobileno')  AS DOUBLE) AS mobileno_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.postal')    AS DOUBLE) AS postal_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.homeno')    AS DOUBLE) AS homeno_score,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.officeno')  AS DOUBLE) AS officeno_score,
+    CASE
+        WHEN reason_code LIKE 'hard_conflict:%|%'                       THEN 'Multiple hard conflicts'
+        WHEN reason_code = 'hard_conflict:shared_mobile_diff_person'      THEN 'Same mobile, different person details'
+        WHEN reason_code = 'hard_conflict:same_name_diff_dob'             THEN 'Same name, different DOB'
+        WHEN reason_code = 'hard_conflict:same_household_diff_first_name' THEN 'Same household, different given name'
+        WHEN reason_code = 'strong_id_only_no_support'                    THEN 'Strong ID without enough support'
+        WHEN reason_code = 'high_score_no_id_anchor'                      THEN 'High score without a strong ID'
+        WHEN reason_code = 'high_score_but_too_few_fields'                THEN 'High score, too few fields compared'
+        WHEN reason_code = 'mid_score_review'                             THEN 'Ambiguous mid-range score'
+        ELSE reason_code
+    END AS review_reason_label,
+    CASE classification
+        WHEN 'MERGE'   THEN 'Merged'
+        WHEN 'EYEBALL' THEN 'Manual Review'
+        ELSE classification
+    END AS classification_label,
+    CASE
+        WHEN match_score >= 90 THEN '90-100'
+        WHEN match_score >= 80 THEN '80-89'
+        WHEN match_score >= 70 THEN '70-79'
+        WHEN match_score >= 60 THEN '60-69'
+        WHEN match_score >= 50 THEN '50-59'
+        ELSE 'Below 50'
+    END AS score_band,
+    run_date
+FROM merge_pairs_sagemaker
+UNION ALL
+SELECT
+    pair_id, record_id_left, record_id_right,
+    match_score, classification, reason_code,
+    hard_conflict_flag, conflict_fields, missing_fields, blocking_rule_ids,
+    source_left, source_right,
+    contract_type_left, contract_type_right,
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.surname')   AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.givenname') AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.dob')       AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.address')   AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.email')     AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.mobileno')  AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.postal')    AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.homeno')    AS DOUBLE),
+    CAST(JSON_EXTRACT_SCALAR(field_scores_json, '$.officeno')  AS DOUBLE),
+    CASE
+        WHEN reason_code LIKE 'hard_conflict:%|%'                       THEN 'Multiple hard conflicts'
+        WHEN reason_code = 'hard_conflict:shared_mobile_diff_person'      THEN 'Same mobile, different person details'
+        WHEN reason_code = 'hard_conflict:same_name_diff_dob'             THEN 'Same name, different DOB'
+        WHEN reason_code = 'hard_conflict:same_household_diff_first_name' THEN 'Same household, different given name'
+        WHEN reason_code = 'strong_id_only_no_support'                    THEN 'Strong ID without enough support'
+        WHEN reason_code = 'high_score_no_id_anchor'                      THEN 'High score without a strong ID'
+        WHEN reason_code = 'high_score_but_too_few_fields'                THEN 'High score, too few fields compared'
+        WHEN reason_code = 'mid_score_review'                             THEN 'Ambiguous mid-range score'
+        ELSE reason_code
+    END,
+    CASE classification WHEN 'MERGE' THEN 'Merged' WHEN 'EYEBALL' THEN 'Manual Review' ELSE classification END,
+    CASE
+        WHEN match_score >= 90 THEN '90-100' WHEN match_score >= 80 THEN '80-89'
+        WHEN match_score >= 70 THEN '70-79'  WHEN match_score >= 60 THEN '60-69'
+        WHEN match_score >= 50 THEN '50-59'  ELSE 'Below 50'
+    END,
+    run_date
+FROM eyeball_pairs_sagemaker;

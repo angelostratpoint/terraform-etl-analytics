@@ -1,0 +1,11 @@
+CREATE OR REPLACE VIEW vw_score_distribution AS
+SELECT run_date, classification_label, score_band,
+    CASE WHEN classification_label = 'Manual Review' AND reason_code LIKE 'hard_conflict%' THEN 'Manual Review: hard conflict'
+         WHEN classification_label = 'Manual Review'                                      THEN 'Manual Review: score-based'
+         ELSE classification_label END AS review_basis,
+    COUNT(*) AS pair_count
+FROM vw_all_pairs
+GROUP BY run_date, classification_label, score_band,
+    CASE WHEN classification_label = 'Manual Review' AND reason_code LIKE 'hard_conflict%' THEN 'Manual Review: hard conflict'
+         WHEN classification_label = 'Manual Review'                                      THEN 'Manual Review: score-based'
+         ELSE classification_label END;

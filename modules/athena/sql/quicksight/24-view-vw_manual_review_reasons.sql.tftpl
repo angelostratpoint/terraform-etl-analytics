@@ -1,0 +1,26 @@
+CREATE OR REPLACE VIEW vw_manual_review_reasons AS
+SELECT run_date, review_reason_label, COUNT(*) AS pair_count,
+    CASE review_reason_label
+        WHEN 'Same mobile, different person details' THEN 1
+        WHEN 'Same name, different DOB' THEN 2
+        WHEN 'Same household, different given name' THEN 3
+        WHEN 'Strong ID without enough support' THEN 4
+        WHEN 'Ambiguous mid-range score' THEN 5
+        ELSE 6
+    END AS review_priority,
+    CASE review_reason_label
+        WHEN 'Same mobile, different person details'
+            THEN 'Confirm whether the number is shared, recycled, or incorrectly encoded.'
+        WHEN 'Same name, different DOB'
+            THEN 'Validate dates before any merge action.'
+        WHEN 'Same household, different given name'
+            THEN 'Treat as probable family members unless stronger evidence exists.'
+        WHEN 'Strong ID without enough support'
+            THEN 'Request additional identity evidence.'
+        WHEN 'Ambiguous mid-range score'
+            THEN 'Review all available fields for additional match evidence.'
+        ELSE 'Review pair details and apply judgment.'
+    END AS reviewer_action
+FROM vw_all_pairs
+WHERE classification_label = 'Manual Review'
+GROUP BY run_date, review_reason_label;

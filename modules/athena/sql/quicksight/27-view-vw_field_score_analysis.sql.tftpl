@@ -1,0 +1,22 @@
+CREATE OR REPLACE VIEW vw_field_score_analysis AS
+SELECT run_date, classification_label,
+    ROUND(AVG(surname_score),   2) AS avg_surname,
+    ROUND(AVG(givenname_score), 2) AS avg_givenname,
+    ROUND(AVG(dob_score),       2) AS avg_dob,
+    ROUND(AVG(address_score),   2) AS avg_address,
+    ROUND(AVG(email_score),     2) AS avg_email,
+    ROUND(AVG(mobileno_score),  2) AS avg_mobileno,
+    ROUND(AVG(postal_score),    2) AS avg_postal,
+    ROUND(AVG(homeno_score),    2) AS avg_homeno,
+    ROUND(AVG(officeno_score),  2) AS avg_officeno,
+    ROUND(COUNT(homeno_score)   * 100.0 / COUNT(*), 1) AS homeno_scored_pct,
+    ROUND(COUNT(officeno_score) * 100.0 / COUNT(*), 1) AS officeno_scored_pct,
+    ROUND(AVG(CASE WHEN surname_score   >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS surname_hit_pct,
+    ROUND(AVG(CASE WHEN givenname_score >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS givenname_hit_pct,
+    ROUND(AVG(CASE WHEN dob_score       >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS dob_hit_pct,
+    ROUND(AVG(CASE WHEN address_score   >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS address_hit_pct,
+    ROUND(AVG(CASE WHEN email_score     >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS email_hit_pct,
+    ROUND(AVG(CASE WHEN mobileno_score  >= 80 THEN 1.0 ELSE 0 END) * 100, 1) AS mobileno_hit_pct,
+    COUNT(*) AS pair_count
+FROM vw_all_pairs
+GROUP BY run_date, classification_label;

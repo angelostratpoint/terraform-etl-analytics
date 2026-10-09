@@ -1,0 +1,7 @@
+CREATE OR REPLACE VIEW vw_contract_type_exposure AS
+SELECT run_date,
+    source,
+    COALESCE(NULLIF(TRIM(contract_type), ''), 'Missing / Blank') AS contract_type_display,
+    COUNT(*) AS record_count
+FROM deduped_input_sagemaker
+GROUP BY run_date, source, COALESCE(NULLIF(TRIM(contract_type), ''), 'Missing / Blank');

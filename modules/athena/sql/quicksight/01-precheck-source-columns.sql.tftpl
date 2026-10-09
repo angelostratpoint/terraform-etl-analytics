@@ -1,0 +1,15 @@
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = current_schema
+  AND table_name IN (
+    'merged',
+    'merge_pairs_sagemaker',
+    'eyeball_pairs_sagemaker',
+    'unique_records_sagemaker',
+    'deduped_input_sagemaker',
+    'clusters_sagemaker',
+    'merge_survivors_sagemaker',
+    'merge_review_sagemaker',
+    'eyeball_review_sagemaker'
+  )
+ORDER BY table_name, ordinal_position;
